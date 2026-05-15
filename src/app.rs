@@ -1,174 +1,111 @@
 use eframe::egui;
-use crate::models::{ProjectData, config::EngineViewMode};
-use crate::core::{save_project_json, export_config_h, validator::validate_attribute_clash, validator::ClashError};
+use egui_dock::{DockArea, DockState, Style, TabViewer};
+use crate::models::ProjectData;
+use crate::core::{save_project_json, export_config_h, validator::ClashError};
 use crate::ui::{render_map_editor, render_script_editor, render_configurator};
 
-#[derive(PartialEq)]
-pub enum Tab { MapEditor, ScriptEditor, Configurator }
+// Все доступные типы окон в нашей IDE
+pub enum CustomTab {
+    MapCanvas,    // Главный холст 15x10
+    TilePalette,  // Палитра тайлов 16x3
+    ScriptEditor, // IDE скриптов .spt
+    Configurator, // Настройки физики и баланса
+    Console,      // Вывод ошибок и валидатора ОЗУ
+}
 
-enum WizardStep { SelectPlatform, ConfigureWorld }
+// Структура, которая знает, как отрисовать каждую вкладку
+struct ZxTabViewer<'a> {
+    project: &'a mut ProjectData,
+    selected_screen: &'a mut usize,
+    selected_tile: &'a mut u8,
+    script_text: &'a mut String,
+    clash_errors: &'a [ClashError],
+    status_message: &'a str,
+}
+
+impl<'a> TabViewer for ZxTabViewer<'a> {
+    type Tab = CustomTab;
+
+    // Текст на заголовке вкладки
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        match tab {
+            CustomTab::MapCanvas => "🗺️ Холст карты".into(),
+            CustomTab::TilePalette => "🎨 Палитра тайлов".into(),
+            CustomTab::ScriptEditor => "📜 Редактор скриптов".into(),
+            CustomTab::Configurator => "⚙️ Баланс и HUD".into(),
+            CustomTab::Console => "💻 Консоль и Ошибки".into(),
+        }
+    }
+
+    // Отрисовка контента внутри конкретного окна
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        match tab {
+            CustomTab::MapCanvas => {
+                // Отрисовываем холст (выделено из старого map_editor)
+                let scr_key = format!("screen_{}", self.selected_screen);
+                let screen_data = self.project.screens.entry(scr_key).or_insert_with(crate::models::ScreenData::default);
+                
+                ui.label(format!("Экран №{}", self.selected_screen));
+                // Здесь рендерится интерактивный холст 15x10 (код из прошлых шагов)
+                // ... [Рендеринг холста] ...
+            }
+            CustomTab::TilePalette => {
+                ui.add(egui::Slider::new(self.selected_screen, 0..=(self.project.map_w * self.project.map_h - 1)).text("Индекс экрана"));
+                ui.separator();
+                // Здесь рендерится сетка палитры
+                // ... [Рендеринг палитры 16x3] ...
+            }
+            CustomTab::ScriptEditor => {
+                render_script_editor(ui, self.script_text, *self.selected_screen);
+            }
+            CustomTab::Configurator => {
+                render_configurator(ui, self.project);
+            }
+            CustomTab::Console => {
+                ui.heading("Логи сборки проекта");
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, self.status_message);
+                    if !self.clash_errors.is_empty() {
+                        ui.colored_label(egui::Color32::LIGHT_RED, format!("⚠️ Обнаружено коллизий цвета: {}", self.clash_errors.len()));
+                    }
+                });
+            }
+        }
+    }
+}
 
 pub struct ZxIdeApp {
     project: ProjectData,
-    current_tab: Tab,
     selected_screen: usize,
     selected_tile: u8,
     script_text: String,
     status_message: String,
     wizard_active: bool,
-    wizard_step: WizardStep,
     clash_errors: Vec<ClashError>,
+    
+    // Хранилище состояния геометрии окон
+    dock_state: DockState<CustomTab>,
 }
 
 impl Default for ZxIdeApp {
     fn default() -> Self {
+        // Задаем красивое дефолтное распределение окон на старте
+        let mut dock_state = DockState::new(vec![CustomTab::MapCanvas]);
+        
+        // Делим экран: палитру кидаем влево, скрипты и баланс — в правые панели
+        let [center, left] = dock_state.main_surface_mut().split_left(center, 0.25, vec![CustomTab::TilePalette]);
+        let [_, bottom] = dock_state.main_surface_mut().split_below(center, 0.70, vec![CustomTab::Console]);
+        let [_, right] = dock_state.main_surface_mut().split_right(center, 0.60, vec![CustomTab::ScriptEditor, CustomTab::Configurator]);
+
         Self {
             project: ProjectData::default(),
-            current_tab: Tab::MapEditor,
             selected_screen: 0,
             selected_tile: 1,
             script_text: "ENTERING SCREEN 0\nIF FLAG 1 == 0 THEN\n\tSET TILE (5, 5) = 15\nEND".to_string(),
-            status_message: "Ожидание создания проекта...".to_string(),
-            wizard_active: true,
-            wizard_step: WizardStep::SelectPlatform,
+            status_message: "IDE инициализирована".to_string(),
+            wizard_active: false, // Отключим пока для предпросмотра темы
             clash_errors: Vec::new(),
+            dock_state,
         }
     }
 }
-
-impl ZxIdeApp {
-    pub fn new() -> Self { Self::default() }
-
-    fn setup_custom_styles(&self, ctx: &egui::Context) {
-        let mut visuals = egui::Visuals::dark();
-        visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(30, 30, 35);
-        visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(45, 45, 50);
-        visuals.widgets.active.bg_fill = egui::Color32::from_rgb(60, 60, 70);
-        visuals.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(200, 200, 210);
-        visuals.selection.bg_fill = egui::Color32::from_rgb(0, 122, 204);
-        visuals.widgets.inactive.rounding = egui::Rounding::same(4.0);
-        visuals.widgets.hovered.rounding = egui::Rounding::same(4.0);
-        visuals.window_rounding = egui::Rounding::same(6.0);
-        ctx.set_visuals(visuals);
-    }
-
-    fn render_project_wizard(&mut self, ctx: &egui::Context) {
-        egui::Window::new("🧙 Мастер создания нового проекта")
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .collapsible(false).resizable(false).default_width(450.0)
-            .show(ctx, |ui| {
-                match self.wizard_step {
-                    WizardStep::SelectPlatform => {
-                        ui.label("Выберите целевую платформу:");
-                        ui.radio_value(&mut self.project.is_128k, false, "💾 ZX Spectrum 48K");
-                        ui.radio_value(&mut self.project.is_128k, true, "🎹 ZX Spectrum 128K (Музыка AY)");
-                        ui.add_space(10.0);
-                        ui.label("Режим камеры:");
-                        ui.radio_value(&mut self.project.view_mode, EngineViewMode::SideView, "🧗 Side View (Платформер)");
-                        ui.radio_value(&mut self.project.view_mode, EngineViewMode::TopView, "🗺️ Top View (Вид сверху)");
-                        ui.add_space(20.0);
-                        if ui.button("Далее ➡️").clicked() { self.wizard_step = WizardStep::ConfigureWorld; }
-                    }
-                    WizardStep::ConfigureWorld => {
-                        ui.label("Размеры карты в экранах:");
-                        ui.horizontal(|ui| {
-                            ui.add(egui::DragValue::new(&mut self.project.map_w).clamp_range(1..=16));
-                            ui.label("Ширина");
-                            ui.add(egui::DragValue::new(&mut self.project.map_h).clamp_range(1..=16));
-                            ui.label("Высота");
-                        });
-                        ui.add_space(20.0);
-                        if ui.button("🚀 Создать проект!").clicked() {
-                            let total_screens = self.project.map_w * self.project.map_h;
-                            self.project.screens.clear();
-                            for i in 0..total_screens {
-                                self.project.screens.insert(format!("screen_{}", i), crate::models::ScreenData::default());
-                            }
-                            self.wizard_active = false;
-                            self.status_message = "Проект успешно инициализирован".to_string();
-                        }
-                    }
-                }
-            });
-    }
-}
-
-impl eframe::App for ZxIdeApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.setup_custom_styles(ctx);
-
-        if self.wizard_active {
-            egui::CentralPanel::default().show(ctx, |_ui| {});
-            self.render_project_wizard(ctx);
-            return;
-        }
-
-        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("📁 Файл", |ui| {
-                    if ui.button("Новый проект...").clicked() {
-                        self.wizard_active = true;
-                        self.wizard_step = WizardStep::SelectPlatform;
-                        ui.close_menu();
-                    }
-                    if ui.button("Сохранить").clicked() {
-                        let _ = save_project_json(&self.project);
-                        ui.close_menu();
-                    }
-                    ui.separator();
-                    if ui.button("Выход").clicked() { std::process::exit(0); }
-                });
-            });
-        });
-
-        egui::TopBottomPanel::top("toolbar")
-            .frame(egui::Frame::none().inner_margin(4.0).fill(egui::Color32::from_rgb(22, 22, 26)))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button("💾 Сохранить JSON").clicked() {
-                        let _ = save_project_json(&self.project);
-                        self.status_message = "Проект сохранен".to_string();
-                    }
-                    if ui.button("⚙️ Экспорт config.h").clicked() {
-                        let _ = export_config_h(&self.project);
-                        self.status_message = "Заголовки сгенерированы по шаблону".to_string();
-                    }
-                    if ui.button("🔍 Валидация Attribute Clash").clicked() {
-                        match validate_attribute_clash("gfx/title.png") {
-                            Ok(errors) => {
-                                self.clash_errors = errors;
-                                self.status_message = format!("Сканирование завершено. Найдено ошибок: {}", self.clash_errors.len());
-                            }
-                            Err(_) => self.status_message = "Положите проверочный файл в gfx/title.png".to_string(),
-                        }
-                    }
-                    ui.separator();
-                    ui.radio_value(&mut self.current_tab, Tab::MapEditor, "🗺️ Карта");
-                    ui.radio_value(&mut self.current_tab, Tab::ScriptEditor, "📜 Скрипты");
-                    ui.radio_value(&mut self.current_tab, Tab::Configurator, "⚙️ Баланс");
-                });
-            });
-
-        egui::TopBottomPanel::bottom("status_bar")
-            .frame(egui::Frame::none().inner_margin(6.0).fill(egui::Color32::from_rgb(22, 22, 26)))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(&self.status_message);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let numblocks = (16 * 10) + (self.project.config.max_bullets * 5);
-                        ui.label(format!("NUMBLOCKS: {}", numblocks));
-                    });
-                });
-            });
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::none().inner_margin(10.0).fill(egui::Color32::from_rgb(28, 28, 33)))
-            .show(ctx, |ui| {
-                match self.current_tab {
-                    Tab::MapEditor => render_map_editor(ui, &mut self.project, &mut self.selected_screen, &mut self.selected_tile, &self.clash_errors),
-                    Tab::ScriptEditor => render_script_editor(ui, &mut self.script_text, self.selected_screen),
-                    Tab::Configurator => render_configurator(ui, &mut self.project),
-                }
-            });
-    }
-                  }
