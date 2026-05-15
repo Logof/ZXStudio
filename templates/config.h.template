@@ -1,0 +1,23 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// ============================================================================
+// АВТОГЕНЕРИРУЕМЫЙ ФАЙЛ ИЗ RUST IDE. НЕ РЕДАКТИРУЙТЕ ВРУЧНУЮ.
+// Дата сборки: {{GENERATION_DATE}}
+// ============================================================================
+
+// Параметры геометрии карты
+#define MAP_W               {{MAP_W}}
+#define MAP_H               {{MAP_H}}
+#define TOTAL_SCREENS       {{TOTAL_SCREENS}}
+#define SCR_INICIO          {{SCR_INICIO}}
+
+// Параметры баланса и ресурсов персонажа
+#define PLAYER_LIFE_INI     {{PLAYER_LIFE_INI}}
+#define MAX_BULLETS         {{MAX_BULLETS}}
+
+// Настройки координат интерфейса HUD
+#define LIFE_X              {{LIFE_X}}
+#define LIFE_Y              {{LIFE_Y}}
+
+#endif // CONFIG_H
