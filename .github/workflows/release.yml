@@ -1,0 +1,79 @@
+name: Автоматическая сборка и публикация IDE (Release)
+
+# Скрипт запускается автоматически при создании тега версии (например, v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Сборка под ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          # Конфигурация сборки под Windows (x86_64)
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: zx_ide.exe
+            asset_name: zx_ide-windows-amd64.exe
+          
+          # Конфигурация сборки под Linux (x86_64)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: zx_ide
+            asset_name: zx_ide-linux-amd64
+          
+          # Конфигурация сборки под macOS (Универсальный бинарник Intel + Apple Silicon M1/M2/M3)
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: zx_ide
+            asset_name: zx_ide-macos-amd64
+
+    steps:
+      # Шаг 1: Скачивание исходного кода репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Шаг 2: Установка системных зависимостей для Linux (Необходимы для работы графики egui/wgpu)
+      - name: Install Linux dependencies
+        if: matrix.job.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libasound2-dev
+
+      # Шаг 3: Инициализация и кэширование стабильной версии компилятора Rust
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.job.target }}
+
+      # Шаг 4: Использование кэша для ускорения повторных сборок зависимостей (Cargo)
+      - name: Cache Cargo dependencies
+        uses: swatinem/rust-cache@v2
+
+      # Шаг 5: Компиляция приложения в режиме максимальной оптимизации (Release)
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.job.target }}
+
+      # Шаг 6: Подготовка бинарных файлов (переименование для дистрибуции)
+      - name: Prepare asset file (Windows)
+        if: matrix.job.os == 'windows-latest'
+        run: cp target/${{ matrix.job.target }}/release/${{ matrix.job.binary_name }} ./${{ matrix.job.asset_name }}
+
+      - name: Prepare asset file (Unix)
+        if: matrix.job.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.job.target }}/release/${{ matrix.job.binary_name }} ./${{ matrix.job.asset_name }}
+          chmod +x ./${{ matrix.job.asset_name }}
+
+      # Шаг 7: Автоматическая публикация собранных файлов на страницу релизов GitHub
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.job.asset_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
