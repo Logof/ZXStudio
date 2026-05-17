@@ -51,23 +51,24 @@ impl ZxIdeApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // Пытаемся загрузить ранее сохраненную геометрию окон из системного хранилища настроек
         let mut dock_state: Option<DockState<CustomTab>> = cc.storage
-            .and_then(|storage| eframe::get_value(storage, "dock_state")); // ИСПРАВЛЕНО НА ПРЯМОЙ ВЫЗОВ
-
-
-        // Если приложение запускается впервые и настроек нет — генерируем дефолтный макет
-        // Пытаемся загрузить ранее сохраненную геометрию окон из системного хранилища настроек
-        let mut dock_state: Option<DockState<CustomTab>> = cc.storage
             .and_then(|storage| eframe::get_value(storage, "dock_state")); // ИСПРАВЛЕНО
 
-
         let final_dock_state = dock_state.unwrap_or_else(|| {
-            let mut default_state = DockState::new(vec![CustomTab::MapCanvas]); // Главное объединенное окно
+            // 1. Создаем центральный узел, куда ОДНИМ ВЕКТОРОМ помещаем три главные вкладки разработки
+            let mut default_state = DockState::new(vec![
+                CustomTab::MapCanvas,      // 🗺️ Конструктор мира (Вкладка 1)
+                CustomTab::ScriptEditor,   // 📜 Редактор скриптов (Вкладка 2)
+                CustomTab::Configurator,   // ⚙️ Настройки движка (Вкладка 3)
+            ]);
             let surface = default_state.main_surface_mut();
             let root_node = egui_dock::NodeIndex::root();
             
-            // Разделяем экран только на Скрипты, Баланс и Консоль ошибок
-            let [center_node, _bottom_node] = surface.split_below(root_node, 0.75, vec![CustomTab::Console]);
-            let [_, _right_node] = surface.split_right(center_node, 0.65, vec![CustomTab::ScriptEditor, CustomTab::Configurator]);
+            // 2. Делим экран по горизонтали: Прижимаем Консоль логов строго в самый низ (20% высоты)
+            let [top_node, _bottom_node] = surface.split_below(root_node, 0.80, vec![CustomTab::Console]);
+            
+            // 3. Вырезаем левую самостоятельную панель под Дерево проекта из верхней зоны
+            let [_left_node, _main_work_node] = surface.split_left(top_node, 0.18, vec![CustomTab::ProjectTree]);
+            
             default_state
         });
 
@@ -162,7 +163,7 @@ impl eframe::App for ZxIdeApp {
                 dock_style.tab.inactive.rounding = egui::Rounding::same(0.0);
                 dock_style.tab.focused.rounding = egui::Rounding::same(0.0);
 
-                let mut viewer = ZxTabViewer {
+                                let mut viewer = ZxTabViewer {
                     project: &mut self.project,
                     selected_screen: &mut self.selected_screen,
                     selected_tile: &mut self.selected_tile,
@@ -172,18 +173,27 @@ impl eframe::App for ZxIdeApp {
                     map_edit_mode: &mut self.map_edit_mode,
                     selected_enemy_type: &mut self.selected_enemy_type,
                     selected_hotspot_type: &mut self.selected_hotspot_type,
-
                     tileset_texture: &self.tileset_texture,
                     sprites_texture: &self.sprites_texture,
-                    
+
                     enable_hotspot_items: &mut self.enable_hotspot_items,
                     enable_hotspot_keys: &mut self.enable_hotspot_keys,
                     enable_hotspot_refills: &mut self.enable_hotspot_refills,
                 };
 
+
                 DockArea::new(&mut self.dock_state)
                     .style(dock_style)
                     .show_inside(ui, &mut viewer);
+
+                // ФИКС: Извлекаем сигнал двойного клика из дерева проекта
+                if let Some(target_tab) = ui.ctx().data_mut(|d| d.remove_temp::<CustomTab>(egui::Id::new("tab_switch_signal"))) {
+                    // Ищем физические координаты вкладки в структуре egui_dock
+                    if let Some(tab_coordinates) = self.dock_state.find_tab(&target_tab) {
+                        // Активируем окно по найденным координатам (SurfaceIndex, NodeIndex, TabIndex)
+                        self.dock_state.set_active_tab(tab_coordinates);
+                    }
+                }
             });
     }
 }

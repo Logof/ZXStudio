@@ -4,8 +4,11 @@ use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
 use crate::models::{ProjectData, ScreenData};
 
-// Импортируем декомпозированные модули палитр и холста
-use crate::ui::{render_map_canvas, render_palette_tiles, render_palette_enemies, render_script_editor, render_configurator};
+// Импортируем компоненты UI
+use crate::ui::{
+    render_map_canvas, render_palette_tiles, render_palette_enemies, 
+    render_script_editor, render_configurator, render_project_tree
+};
 
 pub struct ZxTabViewer<'a> {
     pub project: &'a mut ProjectData,
@@ -30,9 +33,10 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {
+            CustomTab::ProjectTree => "📁 Проект".into(),
             CustomTab::MapCanvas => "🗺️ Конструктор мира".into(),
             CustomTab::ScriptEditor => "📜 Редактор скриптов".into(),
-            CustomTab::Configurator => "⚙️ Баланс и HUD".into(),
+            CustomTab::Configurator => "⚙️ Настройки движка".into(),
             CustomTab::Console => "💻 Логи компиляции".into(),
         }
     }
@@ -43,100 +47,73 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
         }
 
         match tab {
+            // 📑 НОВЫЙ КЕЙС: ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
+            CustomTab::ProjectTree => {
+                if let Some(target_tab) = render_project_tree(ui) {
+                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab));
+                }
+            }
+
             // ============================================================================
-            // ГЛАВНОЕ ОБЪЕДИНЕННОЕ ОКНО РАЗРАБОТКИ (ПРОПОРЦИОНАЛЬНЫЙ ДИЗАЙН)
+            // ОБНОВЛЕННЫЙ КОНСТРУКТОР МИРА: ТЕПЕРЬ ЗАНИМАЕТ ВСЮ ШИРИНУ БЕЗ ДЕРЕВА
             // ============================================================================
             CustomTab::MapCanvas => {
                 let scr_key = format!("screen_{}", self.selected_screen);
 
                 ui.horizontal(|ui| {
-                    // --- SIDEBAR ПАНЕЛЬ ИНСТРУМЕНТОВ СЛЕВА ---
+                    // --- SIDEBAR ИНСТРУМЕНТОВ РИСОВАНИЯ СЛЕВА ---
                     ui.vertical(|ui| {
                         ui.set_max_width(160.0);
-                        
-                        // Получаем доступную высоту всего левого Sidebar
                         let available_height = ui.available_height();
                         
-                        // Распределяем высоту в процентном соотношении (Flex-расчет)
-                        let height_selector = 45.0; // Фиксированная высота выбора комнаты
-                        let height_tiles = available_height * 0.52; // ~52% под тайлы окружения
-                        let height_enemies = available_height * 0.28; // ~28% под спрайты врагов/лифтов
-                        let height_props = available_height * 0.15; // ~15% под инспектор физики/траекторий
+                        let height_selector = 45.0;
+                        let height_tiles = available_height * 0.52;
+                        let height_enemies = available_height * 0.28;
+                        let height_props = available_height * 0.15;
 
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(160.0, height_selector),
-                            egui::Layout::top_down(egui::Align::Min),
+                        ui.allocate_ui_with_layout(egui::vec2(160.0, height_selector), egui::Layout::top_down(egui::Align::Min), |ui| {
+                            ui.group(|ui| {
+                                ui.label("Индекс экрана:");
+                                ui.add(egui::Slider::new(self.selected_screen, 0..=(self.project.map_w * self.project.map_h - 1)));
+                            });
+                        });
 
-                            |ui| {
-                                ui.group(|ui| {
-                                    ui.label("Индекс экрана:");
-                                    ui.add(egui::Slider::new(self.selected_screen, 0..=(self.project.map_w * self.project.map_h - 1)));
-                                });
-                            }
-                        );
+                        if let Some(new_mode) = render_palette_tiles(ui, self.project, self.selected_tile, *self.map_edit_mode == MapEditMode::Tiles, self.tileset_texture) {
+                            *self.map_edit_mode = new_mode;
+                        }
 
-                        // 1. ПАЛИТРА ТАЙЛОВ ОКРУЖЕНИЯ (Выделяем строго 52% пространства)
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(160.0, height_tiles),
-                            egui::Layout::top_down(egui::Align::Min),
+                        if let Some(new_mode) = render_palette_enemies(ui, self.project, self.selected_enemy_type, *self.map_edit_mode == MapEditMode::Enemies, self.sprites_texture) {
+                            *self.map_edit_mode = new_mode;
+                        }
 
-                            |ui| {
-                                if let Some(new_mode) = render_palette_tiles(ui, self.project, self.selected_tile, *self.map_edit_mode == MapEditMode::Tiles, self.tileset_texture) {
-                                    *self.map_edit_mode = new_mode;
-                                }
-                            }
-                        );
-
-                        // 2. ПАЛИТРА ВРАГОВ (Выделяем строго 28% пространства)
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(160.0, height_enemies),
-                            egui::Layout::top_down(egui::Align::Min),
-
-                            |ui| {
-                                if let Some(new_mode) = render_palette_enemies(ui, self.project, self.selected_enemy_type, *self.map_edit_mode == MapEditMode::Enemies, self.sprites_texture) {
-                                    *self.map_edit_mode = new_mode;
-                                }
-                            }
-                        );
-
-                        // 3. ЭТАЖ СВОЙСТВ ФИЗИКИ И ТРАЕКТОРИЙ (Выделяем строго 15% пространства)
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(160.0, height_props),
-                            egui::Layout::top_down(egui::Align::Min),
-
-                            |ui| {
-                                ui.group(|ui| {
-                                    ui.label("⚙️ Параметры кисти:");
-                                    if *self.map_edit_mode == MapEditMode::Tiles && *self.selected_tile < 32 {
-                                        let t_idx = *self.selected_tile as usize;
-                                        let mut current_beh = self.project.tile_behaviours[t_idx];
-                                        egui::ComboBox::from_label("")
-                                            .selected_text(match current_beh { 0 => "🚶 Проходимый", 1 => "💀 Шипы", 4 => "🧗 Платформа", 8 => "🧱 Стена", _ => "Маска" })
-                                            .show_ui(ui, |ui| {
-                                                ui.selectable_value(&mut current_beh, 0, "🚶 0: Walkable");
-                                                ui.selectable_value(&mut current_beh, 1, "💀 1: Kills");
-                                                ui.selectable_value(&mut current_beh, 4, "🧗 4: Platform");
-                                                ui.selectable_value(&mut current_beh, 8, "🧱 8: Obstacle");
-                                            });
-                                        self.project.tile_behaviours[t_idx] = current_beh;
-                                    } else if *self.map_edit_mode == MapEditMode::Enemies {
-                                        let screen_data = self.project.screens.entry(scr_key.clone()).or_insert_with(ScreenData::default);
-                                        if !screen_data.enemies.is_empty() {
-                                            if let Some(enemy) = screen_data.enemies.last_mut() {
-                                                if enemy.tp == 1 || enemy.tp == 2 || enemy.tp == 3 || enemy.tp == 4 {
-                                                    ui.add(egui::DragValue::new(&mut enemy.x1).clamp_range(0..=14).prefix("Мин:"));
-                                                    ui.add(egui::DragValue::new(&mut enemy.x2).clamp_range(0..=14).prefix("Макс:"));
-                                                }
+                        ui.allocate_ui_with_layout(egui::vec2(160.0, height_props), egui::Layout::top_down(egui::Align::Min), |ui| {
+                            ui.group(|ui| {
+                                ui.label("⚙️ Параметры кисти:");
+                                if *self.map_edit_mode == MapEditMode::Tiles && *self.selected_tile < 32 {
+                                    let t_idx = *self.selected_tile as usize;
+                                    let mut current_beh = self.project.tile_behaviours[t_idx];
+                                    egui::ComboBox::from_label("")
+                                        .selected_text(match current_beh { 0 => "🚶 Проходимый", 1 => "💀 Шипы", 4 => "🧗 Платформа", 8 => "🧱 Стена", _ => "Маска" })
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(&mut current_beh, 0, "🚶 0: Walkable");
+                                            ui.selectable_value(&mut current_beh, 1, "💀 1: Kills");
+                                            ui.selectable_value(&mut current_beh, 4, "🧗 4: Platform");
+                                            ui.selectable_value(&mut current_beh, 8, "🧱 8: Obstacle");
+                                        });
+                                    self.project.tile_behaviours[t_idx] = current_beh;
+                                } else if *self.map_edit_mode == MapEditMode::Enemies {
+                                    let screen_data = self.project.screens.entry(scr_key.clone()).or_insert_with(ScreenData::default);
+                                    if !screen_data.enemies.is_empty() {
+                                        if let Some(enemy) = screen_data.enemies.last_mut() {
+                                            if enemy.tp == 1 || enemy.tp == 2 || enemy.tp == 3 || enemy.tp == 4 {
+                                                ui.add(egui::DragValue::new(&mut enemy.x1).clamp_range(0..=14).prefix("Мин:"));
+                                                ui.add(egui::DragValue::new(&mut enemy.x2).clamp_range(0..=14).prefix("Макс:"));
                                             }
-                                        } else {
-                                            ui.small("Нет активных врагов.");
                                         }
-                                    } else {
-                                        ui.small("Кликните на объект.");
-                                    }
-                                });
-                            }
-                        );
+                                    } else { ui.small("Нет активных врагов."); }
+                                } else { ui.small("Кликните на объект."); }
+                            });
+                        });
                     });
 
                     ui.separator();

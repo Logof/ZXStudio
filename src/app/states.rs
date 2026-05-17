@@ -13,6 +13,7 @@ pub enum MapEditMode {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum CustomTab {
+    ProjectTree,
     MapCanvas,
     ScriptEditor,
     Configurator,

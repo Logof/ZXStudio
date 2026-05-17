@@ -1,6 +1,8 @@
 use eframe::egui;
 use super::mod_struct::ZxIdeApp;
-use crate::core::{save_project_json, export_config_h};
+// ФИКС: Импортируем CustomTab строго из модуля состояний нашего приложения app
+use super::states::CustomTab; 
+use crate::core::{save_project_json, export_config_h, export_enems_h};
 
 pub fn render_menu_bar(app: &mut ZxIdeApp, ctx: &egui::Context) {
     egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
@@ -11,9 +13,10 @@ pub fn render_menu_bar(app: &mut ZxIdeApp, ctx: &egui::Context) {
                     app.status_message = "Проект сохранен в map/mapa.prj".to_string();
                     ui.close_menu();
                 }
-                if ui.button("⚙️ Сгенерировать config.h").clicked() {
+                if ui.button("⚙️ Сгенерировать Си-код").clicked() {
                     let _ = export_config_h(&app.project);
-                    app.status_message = "Заголовки Си сгенерированы по шаблону".to_string();
+                    let _ = export_enems_h(&app.project);
+                    app.status_message = "Заголовки Си сгенерированы по шаблонам".to_string();
                     ui.close_menu();
                 }
                 ui.separator();
@@ -30,11 +33,26 @@ pub fn render_menu_bar(app: &mut ZxIdeApp, ctx: &egui::Context) {
                 }
             });
 
-            // --- УЛУЧШЕНИЕ №3: ИНТЕРАКТИВНОЕ МЕНЮ ВКЛЮЧЕНИЯ/ОТКЛЮЧЕНИЯ ХОТСПOТОВ ---
-            ui.menu_button("⭐ Хотспоты", |ui| {
-                ui.checkbox(&mut app.enable_hotspot_items, "🌟 Включить Предметы (Тайл 17)");
-                ui.checkbox(&mut app.enable_hotspot_keys, "🔑 Включить Ключи (Тайл 18)");
-                ui.checkbox(&mut app.enable_hotspot_refills, "❤️ Включить Аптечки (Тайл 16)");
+            // 📺 МЕНЮ УПРАВЛЕНИЯ ГЕОМЕТРИЕЙ ОКOН IDE (ИСПРАВЛЕНЫ ИМПОРТЫ ТИПОВ)
+            ui.menu_button("📺 Окно", |ui| {
+                if ui.button("🔄 Сбросить макет панелей").clicked() {
+                    let mut default_state = egui_dock::DockState::new(vec![
+                        CustomTab::MapCanvas,
+                        CustomTab::ScriptEditor,
+                        CustomTab::Configurator,
+                    ]);
+                    let surface = default_state.main_surface_mut();
+                    let root_node = egui_dock::NodeIndex::root();
+                    
+                    // Консоль строго вниз
+                    let [top_node, _bottom_node] = surface.split_below(root_node, 0.80, vec![CustomTab::Console]);
+                    // Дерево проекта строго влево
+                    let [_left_node, _main_work_node] = surface.split_left(top_node, 0.18, vec![CustomTab::ProjectTree]);
+                    
+                    app.dock_state = default_state;
+                    app.status_message = "Расположение панелей успешно восстановлено!".to_string();
+                    ui.close_menu();
+                }
             });
         });
     });
