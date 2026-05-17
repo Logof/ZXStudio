@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ScreenData {
-    pub tiles_matrix: Vec<u8>, // 150 байт (15x10 тайлов)
-    pub enemies: Vec<Enemy>,   // Ограничение движка: строго до 3 врагов
-    pub hotspot: Hotspot,      // Ограничение движка: строго 1 хотспот
+    pub tiles_matrix: Vec<u8>, 
+    pub enemies: Vec<Enemy>,   // Ограничение движка: строго до 3 врагов (NO_MAX_ENEMS)
+    pub hotspot: Hotspot,      
 }
 
 impl Default for ScreenData {
@@ -17,16 +17,21 @@ impl Default for ScreenData {
     }
 }
 
+// ВАЖНО: Добавляем поля границ траектории для Си-компилятора (ТЗ Шаг 6 и Шаг 10)
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Enemy {
-    pub tp: u8, // Тип поведения (1-14)
-    pub x: u8,
-    pub y: u8,
+    pub tp: u8,      // Тип поведения (1-14)
+    pub x: u8,       // Стартовая позиция X на сетке (0..14)
+    pub y: u8,       // Стартовая позиция Y на сетке (0..9)
+    pub x1: u8,      // Левая/Верхняя граница движения (в тайлах)
+    pub x2: u8,      // Правая/Нижняя граница движения (в тайлах)
+    pub y1: u8,      // Верхняя граница для Квадраторов
+    pub y2: u8,      // Нижняя граница для Квадраторов
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Hotspot {
-    pub tp: u8, // Тип хотспота (1 - предмет, 2 - ключ, 3 - рефил)
+    pub tp: u8, 
     pub x: u8,
     pub y: u8,
 }

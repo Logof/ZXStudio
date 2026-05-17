@@ -1,9 +1,9 @@
-use image::{GenericImageView, RgbImage};
+use image::RgbImage;
 use std::collections::HashSet;
 
 pub struct ClashError {
-    pub x_block: usize, // Координата знакоместа по X (0..31)
-    pub y_block: usize, // Координата знакоместа по Y (0..23)
+    pub x_block: usize,
+    pub y_block: usize,
 }
 
 pub fn validate_attribute_clash(image_path: &str) -> Result<Vec<ClashError>, image::ImageError> {
@@ -23,7 +23,7 @@ pub fn validate_attribute_clash(image_path: &str) -> Result<Vec<ClashError>, ima
                         (block_x * 8 + pixel_x) as u32,
                         (block_y * 8 + pixel_y) as u32,
                     );
-                    unique_colors.insert((px[0], px[1], px[2]));
+                    unique_colors.insert((px, px, px));
                 }
             }
 

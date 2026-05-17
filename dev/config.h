@@ -3,7 +3,7 @@
 
 // ============================================================================
 // АВТОГЕНЕРИРУЕМЫЙ ФАЙЛ ИЗ RUST IDE. НЕ РЕДАКТИРУЙТЕ ВРУЧНУЮ.
-// Дата сборки: {{GENERATION_DATE}}
+// Дата сборки: 2026-05-17
 // Target Profile: {{TARGET_PROFILE}} (ZX Spectrum 48K/128K)
 // Engine View Mode: {{ENGINE_VIEW_MODE}}
 // ============================================================================
@@ -80,7 +80,7 @@
 // ----------------------------------------------------------------------------
 {{TOGGLE_PLAYER_CAN_FIRE}}               // If defined, shooting engine is enabled.
 #define PLAYER_BULLET_SPEED      {{PLAYER_BULLET_SPEED}}   // Pixels/frame. 
-#define MAX_BULLETS              {{MAX_BULLETS}}           // Max number of bullets on screen.
+#define MAX_BULLETS              3           // Max number of bullets on screen.
 #define PLAYER_BULLET_Y_OFFSET   {{PLAYER_BULLET_Y_OFFSET}} // vertical offset from the player's top.
 #define PLAYER_AX_RECOIL         {{PLAYER_AX_RECOIL}}      // If defined, recoil.
 {{TOGGLE_FIRING_DRAINS_LIFE}}            // If defined, firing drains life
@@ -168,16 +168,16 @@
 
 // XV. НАСТРОЙКИ ЭКРАННОЙ ГЕОМЕТРИИ И КООРДИНАТ HUD ЗНАКОМЕСТ
 // ----------------------------------------------------------------------------
-#define MAP_W                    {{MAP_W}}                 // Глобальная ширина мира
-#define MAP_H                    {{MAP_H}}                 // Глобальная высота мира
-#define TOTAL_SCREENS            {{TOTAL_SCREENS}}         // Общее число комнат
-#define SCR_INICIO               {{SCR_INICIO}}            // Стартовая комната спавна
+#define MAP_W                    4                 // Глобальная ширина мира
+#define MAP_H                    4                 // Глобальная высота мира
+#define TOTAL_SCREENS            16         // Общее число комнат
+#define SCR_INICIO               0            // Стартовая комната спавна
 
 #define VIEWPORT_X               {{VIEWPORT_X}}            // Позиция игрового окна X
 #define VIEWPORT_Y               {{VIEWPORT_Y}}            // Позиция игрового окна Y
 
-#define LIFE_X                   {{LIFE_X}}                // Позиция индикатора здоровья X
-#define LIFE_Y                   {{LIFE_Y}}                // Позиция индикатора здоровья Y
+#define LIFE_X                   1                // Позиция индикатора здоровья X
+#define LIFE_Y                   21                // Позиция индикатора здоровья Y
 {{TOGGLE_DRAW_HI_DIGIT}}
 #define LIFE_H_X                 {{LIFE_H_X}}
 #define LIFE_H_Y                 {{LIFE_H_Y}}
@@ -262,6 +262,9 @@
 // XVIII. ФИЗИЧЕСКАЯ МАТРИЦА ПОВЕДЕНИЯ ТАЙЛОВ ПЛАТФОРМЫ
 // ----------------------------------------------------------------------------
 // Сюда наш Rust-движок запишет сгенерированный Си-массив
-{{TILE_BEHAVIOURS_ARRAY}}
+unsigned char comportamiento_tiles [] = {
+	0, 0, 8, 8, 8, 8, 1, 1, 8, 0, 1, 8, 0, 8, 8, 8, 
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+};
 
 #endif // CONFIG_H

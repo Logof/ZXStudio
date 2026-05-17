@@ -13,6 +13,8 @@ pub struct PhysicsConfig {
     pub max_bullets: u32,
     pub hud_life_x: u32,
     pub hud_life_y: u32,
+
+    pub enemies_life_gauge: u8,
 }
 
 impl Default for PhysicsConfig {
@@ -22,6 +24,8 @@ impl Default for PhysicsConfig {
             max_bullets: 3,
             hud_life_x: 1,
             hud_life_y: 21,
+
+            enemies_life_gauge: 1,
         }
     }
 }

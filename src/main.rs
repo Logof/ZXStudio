@@ -7,13 +7,12 @@ use app::ZxIdeApp;
 use std::fs;
 
 fn main() -> Result<(), eframe::Error> {
-    // Создаем необходимые системные каталоги согласно структуре ТЗ
+    // Создаем системные каталоги ТЗ
     let _ = fs::create_dir_all("map");
     let _ = fs::create_dir_all("dev");
     let _ = fs::create_dir_all("templates");
     let _ = fs::create_dir_all("gfx");
 
-    // Восстанавливаем базовый шаблон конфигурации, если он отсутствует на диске
     let template_path = "templates/config.h.template";
     if !std::path::Path::new(template_path).exists() {
         let default_template = include_str!("../templates/config.h.template");
@@ -28,6 +27,6 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "ZX Spectrum 48K/128K Единая Среда Разработки (Rust + egui)",
         options,
-        Box::new(|_cc| Box::new(ZxIdeApp::new())),
+        Box::new(|cc| Box::new(ZxIdeApp::new(cc))),
     )
 }
