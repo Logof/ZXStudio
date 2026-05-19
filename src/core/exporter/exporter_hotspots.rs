@@ -1,7 +1,7 @@
 use crate::models::ProjectData;
 
 /// Сборка Си-кода массива hotspots с байтовым сжатием координат XY
-pub fn build_hotspots_source(project: &ProjectData, total_screens: usize) -> String {
+pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> String {
     let mut n_hotspots_type = vec![0; 8]; // Индексы 0..7 под типы хотспотов
     let mut body = String::new();
 

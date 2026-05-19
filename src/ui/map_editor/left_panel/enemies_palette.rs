@@ -1,5 +1,5 @@
+use crate::models::ProjectData;
 use eframe::egui;
-use crate::models::{ProjectData, config::EngineViewMode};
 
 pub fn render(
     ui: &mut egui::Ui,
@@ -16,16 +16,20 @@ pub fn render(
         (2, "👾 Враг Слота 3 (Спрайт 12)", 12),
     ];
 
-    match project.view_mode {
-        EngineViewMode::SideView => { sprite_slots.push((3, "🧗 Движ. Платформа (Спрайт 14)", 14)); }
-        EngineViewMode::TopView => { sprite_slots.push((3, "👾 Враг Слота 4 (Спрайт 14)", 14)); }
+    if project.config.movement_controls.player_genital {
+        sprite_slots.push((3, "👾 Враг Слота 4 (Спрайт 14)", 14));
+    } else {
+        sprite_slots.push((3, "🧗 Движ. Платформа (Спрайт 14)", 14));
     }
 
     ui.horizontal(|ui| {
         for &(slot_id, label, raw_sprite_id) in &sprite_slots {
             let mut button = egui::Button::new("");
             if *selected_enemy_sprite_slot == slot_id {
-                button = button.stroke(egui::Stroke::new(2.0, egui::Color32::from_rgb(180, 50, 255)));
+                button = button.stroke(egui::Stroke::new(
+                    2.0,
+                    egui::Color32::from_rgb(180, 50, 255),
+                ));
             }
 
             let btn_res = ui.add_sized([40.0, 40.0], button).on_hover_text(label);
@@ -36,13 +40,29 @@ pub fn render(
 
                 let eps = 0.5;
                 let uv_min = egui::pos2((sprite_x + eps) / 256.0, (sprite_y + eps) / 32.0);
-                let uv_max = egui::pos2((sprite_x + 16.0 - eps) / 256.0, (sprite_y + 16.0 - eps) / 32.0);
-                ui.painter().image(tex.id(), btn_res.rect.shrink(2.0), egui::Rect::from_min_max(uv_min, uv_max), egui::Color32::WHITE);
+                let uv_max = egui::pos2(
+                    (sprite_x + 16.0 - eps) / 256.0,
+                    (sprite_y + 16.0 - eps) / 32.0,
+                );
+                ui.painter().image(
+                    tex.id(),
+                    btn_res.rect.shrink(2.0),
+                    egui::Rect::from_min_max(uv_min, uv_max),
+                    egui::Color32::WHITE,
+                );
             } else {
-                ui.painter().text(btn_res.rect.center(), egui::Align2::CENTER_CENTER, format!("S{}", slot_id), egui::FontId::proportional(12.0), egui::Color32::GRAY);
+                ui.painter().text(
+                    btn_res.rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    format!("S{}", slot_id),
+                    egui::FontId::proportional(12.0),
+                    egui::Color32::GRAY,
+                );
             }
 
-            if btn_res.clicked() { *selected_enemy_sprite_slot = slot_id; }
+            if btn_res.clicked() {
+                *selected_enemy_sprite_slot = slot_id;
+            }
         }
     });
 
@@ -57,7 +77,7 @@ pub fn render(
     // ВЫПАДАЮЩИЙ СПИСОК ТИПОВ ПОВЕДЕНИЯ ДВИЖКА (Capítulo 5)
     ui.group(|ui| {
         ui.label("🧠 Поведение по умолчанию при спавне:");
-        
+
         egui::ComboBox::from_id_source("default_ai_combobox")
             .selected_text(match current_default_ai {
                 1..=4 => format!("Тип {} (0x{:02X}) - Линейный", current_default_ai, current_default_ai),
@@ -72,20 +92,29 @@ pub fn render(
                 ui.selectable_value(&mut current_default_ai, 1, "Тип 1 (0x01): Линейный ИИ");
                 ui.selectable_value(&mut current_default_ai, 2, "Тип 2 (0x02): Линейный ИИ");
                 ui.selectable_value(&mut current_default_ai, 3, "Тип 3 (0x03): Линейный ИИ");
-                let t4_name = match project.view_mode { EngineViewMode::SideView => "Тип 4 (0x04): Платформа / Лифт", EngineViewMode::TopView => "Тип 4 (0x04): Линейный ИИ" };
+                let t4_name = if project.config.movement_controls.player_genital {
+                    "Тип 4 (0x04): Линейный ИИ"
+                } else {
+                    "Тип 4 (0x04): Платформа / Лифт"
+                };
+
                 ui.selectable_value(&mut current_default_ai, 4, t4_name);
-                
+
                 ui.separator();
                 ui.label("Воладоры / Летающие:");
                 ui.selectable_value(&mut current_default_ai, 5, "Тип 5 (0x05): Random Respawn Призрак");
                 ui.selectable_value(&mut current_default_ai, 6, "Тип 6 (0x06): Настоящий Fanty Призрак");
-                
+
                 ui.separator();
                 ui.label("Куадраторы (По внешнему борту):");
                 ui.selectable_value(&mut current_default_ai, 7, "Тип 7 (0x07): Куадратор");
                 ui.selectable_value(&mut current_default_ai, 8, "Тип 8 (0x08): Куадратор");
                 ui.selectable_value(&mut current_default_ai, 9, "Тип 9 (0x09): Куадратор");
-                let t10_name = match project.view_mode { EngineViewMode::SideView => "Тип 10 (0x0A): Пл. Куадратор (Лифт)", EngineViewMode::TopView => "Тип 10 (0x0A): Куадратор ИИ" };
+                let t10_name = if project.config.movement_controls.player_genital {
+                    "Тип 10 (0x0A): Куадратор ИИ"
+                } else {
+                    "Тип 10 (0x0A): Пл. Куадратор (Лифт)"
+                };
                 ui.selectable_value(&mut current_default_ai, 10, t10_name);
 
                 ui.separator();

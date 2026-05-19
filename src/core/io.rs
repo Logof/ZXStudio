@@ -49,7 +49,7 @@ pub fn export_enems_h(project_path: &str, project: &ProjectData) -> Result<(), s
     }
 
     let target_path = game_root.join("dev/enems.h");
-    let total_screens = project.map_w * project.map_h;
+    let total_screens = project.config.map_goals.map_w * project.config.map_goals.map_h;
 
     let mut final_source = String::new();
     final_source.push_str("// MTE MK1 (la Churrera) v4\n// Generated автоматически из декомпозированных модулей Rust IDE\n\n");

@@ -1,3 +1,4 @@
+// src/ui/configurator/mechanics_enemies.rs
 use crate::models::ProjectData;
 use eframe::egui;
 
@@ -30,6 +31,7 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
     ui.strong("🧲 Предметы, Ключи и Триггеры");
     ui.add_space(4.0);
 
+    // Двухколоночный макет с обращением по индексам columns[0] и columns[1]
     ui.columns(2, |columns| {
         columns[0].checkbox(
             &mut project.config.mechanics_enemies.deactivate_keys,
@@ -37,7 +39,7 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
         );
         columns[0].checkbox(
             &mut project.config.mechanics_enemies.deactivate_objects,
-            "DEACTIVATE_OBJECTS (Убрать квестовые предметы)",
+            "DEACTIVATE_OBJECTS (Убрать предметы)",
         );
         columns[0].checkbox(
             &mut project.config.mechanics_enemies.deactivate_refills,
@@ -50,12 +52,24 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
         );
         columns[1].checkbox(
             &mut project.config.mechanics_enemies.reverse_objects_count,
-            "REVERSE_OBJECTS_COUNT (Обратный отсчет предметов)",
+            "REVERSE_OBJECTS_COUNT (Обратный отсчет)",
         );
-        columns[1].checkbox(
-            &mut project.config.mechanics_enemies.custom_lock_clear,
-            "CUSTOM_LOCK_CLEAR (Кастомный скрипт дверей)",
-        );
+
+        // Реактивный чекбокс CUSTOM_LOCK_CLEAR
+        let mut lock_clear = project.config.mechanics_enemies.custom_lock_clear;
+        if columns[1]
+            .checkbox(&mut lock_clear, "CUSTOM_LOCK_CLEAR (Кастомный скрипт)")
+            .changed()
+        {
+            project.config.mechanics_enemies.custom_lock_clear = lock_clear;
+
+            if lock_clear {
+                // ИСПРАВЛЕНО [E0502]: Берем контекст у изолированной колонки columns[1], а не у родительского ui!
+                columns[1].ctx().data_mut(|d| {
+                    d.insert_temp(egui::Id::new("trigger_create_lock_clear"), true);
+                });
+            }
+        }
     });
 
     ui.add_space(4.0);

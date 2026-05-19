@@ -5,13 +5,9 @@ use eframe::egui;
 use egui_dock::TabViewer;
 
 // Импортируем компоненты UI
-/*use crate::ui::{
-    render_map_canvas, render_palette_tiles, render_palette_enemies,
-    render_script_editor, render_configurator, render_project_tree
-};*/
-use crate::ui::{
-    render_configurator, render_hud_editor, render_project_tree, render_script_editor,
-};
+use crate::ui::{render_configurator, render_project_tree, render_script_editor};
+// 🆕 ИСПРАВЛЕНО: Импортируем функцию из нового декомпозированного модуля папки
+use crate::ui::hud_editor::render_hud_editor;
 
 use crate::ui::configurator::ConfigTab;
 use crate::ui::map_editor::render_map_editor;
@@ -21,7 +17,8 @@ pub struct ZxTabViewer<'a> {
     pub project_name: &'a str,
     pub project_path: &'a str,
 
-    pub configurator_tab: &'a mut ConfigTab,
+    pub configurator_tab: &'a mut ConfigTab, // Ссылка на вкладку настроек движка
+
     pub selected_screen: &'a mut usize,
     pub selected_tile: &'a mut u8,
     pub script_text: &'a mut String,
@@ -60,7 +57,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
         }
 
         match tab {
-            // 📑 НОВЫЙ КЕЙС: ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
+            // 📑 ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
             CustomTab::ProjectTree => {
                 if let Some(target_tab) = render_project_tree(ui, &self.project_path) {
                     ui.ctx().data_mut(|d| {
@@ -70,7 +67,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             // ============================================================================
-            // ОБНОВЛЕННЫЙ КОНСТРУКТОР МИРА: ТЕПЕРЬ ЗАНИМАЕТ ВСЮ ШИРИНУ БЕЗ ДЕРЕВА
+            // КОНСТРУКТОР МИРА: ЗАНИМАЕТ ВСЮ ШИРИНУ БЕЗ ДЕРЕВА
             // ============================================================================
             CustomTab::MapCanvas => {
                 crate::ui::map_editor::render_map_editor(
@@ -80,7 +77,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     self.selected_tile,
                     self.clash_errors,
                     self.map_edit_mode,
-                    self.selected_enemy_type, // Передаем графическую кисть u8
+                    self.selected_enemy_type,
                     self.tileset_texture,
                     self.sprites_texture,
                 );
@@ -90,9 +87,11 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 render_script_editor(ui, self.script_text, *self.selected_screen);
             }
             CustomTab::Configurator => {
+                // Передаем третьим параметром ссылку на активную вкладку
                 render_configurator(ui, self.project, self.configurator_tab);
             }
             CustomTab::HudEditor => {
+                // Вызов декомпозированного HUD-редактора из папки
                 render_hud_editor(ui, self.project, &self.hud_frame_texture);
             }
             CustomTab::Console => {

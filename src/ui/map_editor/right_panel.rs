@@ -15,7 +15,7 @@ pub fn render(
     tileset_texture: &Option<egui::TextureHandle>,
 ) {
     ui.vertical(|ui| {
-        let max_screens = (project.map_w * project.map_h) as usize - 1;
+        let max_screens = (project.config.map_goals.map_w * project.config.map_goals.map_h) as usize - 1;
 
         // Блок навигации НАД холстом
         ui.horizontal(|ui| {

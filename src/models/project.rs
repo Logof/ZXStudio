@@ -1,15 +1,10 @@
-use super::config::{EngineViewMode, PhysicsConfig};
+use super::config::PhysicsConfig;
 use super::screen::ScreenData;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProjectData {
-    pub map_w: usize,
-    pub map_h: usize,
-    pub scr_inicio: usize,
-    pub view_mode: EngineViewMode,
-    pub is_128k: bool,
     pub config: PhysicsConfig,
     pub screens: HashMap<String, ScreenData>,
 
@@ -39,11 +34,6 @@ impl Default for ProjectData {
         ];
 
         Self {
-            map_w: 4,
-            map_h: 4,
-            scr_inicio: 0,
-            view_mode: EngineViewMode::SideView,
-            is_128k: false,
             config: PhysicsConfig::default(),
             screens,
             // По умолчанию роли выключены, геймдизайнер включает их кликом

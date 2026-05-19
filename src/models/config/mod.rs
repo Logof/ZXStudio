@@ -36,9 +36,3 @@ impl Default for PhysicsConfig {
         }
     }
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum EngineViewMode {
-    SideView,
-    TopView,
-}

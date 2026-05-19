@@ -1,7 +1,7 @@
+use crate::app::states::CustomTab;
 use eframe::egui;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::app::states::CustomTab;
 
 /// Рендерит динамическое дерево проекта на основе реальной папки, где лежит .prj файл
 pub fn render_project_tree(ui: &mut egui::Ui, absolute_project_path: &str) -> Option<CustomTab> {
@@ -11,11 +11,15 @@ pub fn render_project_tree(ui: &mut egui::Ui, absolute_project_path: &str) -> Op
         let root_dir = Path::new(absolute_project_path);
 
         // Извлекаем имя папки для красивого заголовка дерева
-        let game_name = root_dir.file_name()
+        let game_name = root_dir
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("Retro Game");
 
-        ui.colored_label(egui::Color32::from_rgb(0, 255, 255), format!("📁 {}", game_name));
+        ui.colored_label(
+            egui::Color32::from_rgb(0, 255, 255),
+            format!("📁 {}", game_name),
+        );
         ui.add_space(4.0);
 
         if !root_dir.exists() || !root_dir.is_dir() {
@@ -41,7 +45,9 @@ fn render_directory_node(ui: &mut egui::Ui, dir_path: &Path) -> Option<CustomTab
     let mut tab_signal = None;
 
     if let Ok(entries) = fs::read_dir(dir_path) {
-        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|entry| entry.path())).collect();
+        let mut paths: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok().map(|entry| entry.path()))
+            .collect();
 
         // Сортировка: сначала папки, потом файлы
         paths.sort_by(|a, b| {
@@ -75,15 +81,19 @@ fn render_directory_node(ui: &mut egui::Ui, dir_path: &Path) -> Option<CustomTab
 
                 header_response.header_response.context_menu(|ui| {
                     ui.set_min_width(180.0);
-                    if ui.button(format!("📥 Импортировать в '{}'", name_str)).clicked() {
-                        let mut dialog = rfd::FileDialog::new().set_title("Выберите файлы для импорта");
+                    if ui
+                        .button(format!("📥 Импортировать в '{}'", name_str))
+                        .clicked()
+                    {
+                        let mut dialog =
+                            rfd::FileDialog::new().set_title("Выберите файлы для импорта");
 
                         dialog = match name_str {
                             "gfx" => dialog.add_filter("Изображения (PNG)", &["png", "PNG"]),
                             "script" => dialog.add_filter("Скрипты (.spt)", &["spt"]),
                             "dev" => dialog.add_filter("Заголовочные файлы Си (.h)", &["h"]),
                             "mus" => dialog.add_filter("Музыка", &["pt3", "mus"]),
-                            _ => dialog
+                            _ => dialog,
                         };
 
                         if let Some(external_files) = dialog.pick_files() {
@@ -97,24 +107,47 @@ fn render_directory_node(ui: &mut egui::Ui, dir_path: &Path) -> Option<CustomTab
                         ui.close_menu();
                     }
                 });
-
             } else if path.is_file() {
                 let name_lower = name_str.to_lowercase();
-                let icon = if name_lower.ends_with(".spt") { "📜 " }
-                    else if name_lower.ends_with(".h") { "⚙️ " }
-                    else if name_lower.ends_with(".png") { "🖼 " }
-                    else { "📄 " };
+                let icon = if name_lower.ends_with(".spt") {
+                    "📜 "
+                } else if name_lower.ends_with(".h") {
+                    "⚙️ "
+                } else if name_lower.ends_with(".png") {
+                    "🖼 "
+                } else {
+                    "📄 "
+                };
 
                 let display_label = format!("{}{}", icon, name_str);
                 let response = ui.selectable_label(false, display_label);
 
                 if response.double_clicked() {
-                    if name_lower.ends_with(".spt") {
+                    // Проверяем, находится ли текущий .h файл внутри подпапки "script"
+                    let is_in_script_dir = path.components().any(|c| c.as_os_str() == "script");
+                    let is_in_dev_dir = path.components().any(|c| c.as_os_str() == "dev");
+
+                    if is_in_script_dir && name_lower.ends_with(".spt") {
                         tab_signal = Some(CustomTab::ScriptEditor);
-                    } else if name_str == "config.h" {
-                        tab_signal = Some(CustomTab::HudEditor);
-                    } else if name_lower.ends_with(".h") {
-                        tab_signal = Some(CustomTab::Configurator);
+                    }
+
+                    if is_in_dev_dir && name_lower.ends_with(".h") {
+                        if name_lower == "config.h" {
+                            tab_signal = Some(CustomTab::Configurator);
+                        } else {
+                            // 🆕 ПРИОРИТЕТНАЯ ПРАВКА: Если файл .h лежит в папке script, открываем в текстовом редакторе скриптов
+                            tab_signal = Some(CustomTab::ScriptEditor);
+
+                            // Посылаем сигнал главному приложению ZxIdeApp на чтение файла с диска
+                            if let Some(path_str) = path.to_str() {
+                                ui.ctx().data_mut(|d| {
+                                    d.insert_temp(
+                                        egui::Id::new("trigger_load_script_file"),
+                                        path_str.to_string(),
+                                    );
+                                });
+                            }
+                        }
                     } else if name_lower.ends_with(".prj") || name_lower.ends_with(".map") {
                         tab_signal = Some(CustomTab::MapCanvas);
                     }

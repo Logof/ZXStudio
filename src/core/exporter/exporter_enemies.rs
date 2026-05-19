@@ -1,8 +1,7 @@
 use crate::models::ProjectData;
-use std::path::{Path};
 
 /// Сборка Си-кода массива malotes и дефайнов количества врагов по типам ИИ
-pub fn build_enemies_source(project: &ProjectData, total_screens: usize) -> String {
+pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String {
     let mut n_enems_type = vec![0; 15]; // Индексы 0..14 под типы ИИ врагов
     let mut body = String::new();
 
@@ -24,7 +23,8 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: usize) -> Stri
                 let y2_px = enemy.y2 * 16;
 
                 // Авто-вычисление стартовых векторов mx/my на основе оси движения
-                let is_horizontal = enemy.x1 != enemy.x2 || (enemy.y1 == enemy.y2 && enemy.x1 == enemy.x);
+                let is_horizontal =
+                    enemy.x1 != enemy.x2 || (enemy.y1 == enemy.y2 && enemy.x1 == enemy.x);
                 let (mx, my) = if is_horizontal { (1, 0) } else { (0, 1) };
 
                 body.push_str(&format!(

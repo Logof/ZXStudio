@@ -171,6 +171,74 @@ impl eframe::App for ZxIdeApp {
                         self.dock_state.set_active_tab(tab_coordinates);
                     }
                 }
+
+                // 🆕 НОВЫЙ БЛОК: Перехватываем сигнал из конфигуратора и создаем файл!
+                if let Some(true) = ui
+                    .ctx()
+                    .data_mut(|d| d.remove_temp::<bool>(egui::Id::new("trigger_create_lock_clear")))
+                {
+                    // Теперь у нас есть прямой доступ к self.project_path и self.status_message!
+                    match create_custom_lock_clear_file(&self.project_path) {
+                        Ok(()) => {
+                            self.status_message =
+                                "✨ Файл dev/custom_lock_clear.h успешно добавлен в проект"
+                                    .to_string();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("❌ Ошибка автогенерации скрипта: {}", e);
+                        }
+                    }
+                }
+
+                // Перехватываем сигнал двойного клика из дерева проекта
+                if let Some(file_to_load) = ui.ctx().data_mut(|d| {
+                    d.remove_temp::<String>(egui::Id::new("trigger_load_script_file"))
+                }) {
+                    // Безопасно читаем файл с диска и пишем в буфер редактора скриптов
+                    match std::fs::read_to_string(&file_to_load) {
+                        Ok(content) => {
+                            self.script_text = content;
+
+                            // Вырезаем имя файла для красивого вывода в статус-бар
+                            if let Some(name) = std::path::Path::new(&file_to_load).file_name() {
+                                self.status_message = format!(
+                                    "📖 Файл {} успешно открыт в редакторе",
+                                    name.to_string_lossy()
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            self.status_message = format!("❌ Не удалось прочитать файл: {}", e);
+                        }
+                    }
+                }
             });
     }
+}
+
+fn create_custom_lock_clear_file(project_path: &str) -> std::io::Result<()> {
+    use std::fs;
+    use std::io::Write;
+    use std::path::Path;
+
+    if project_path.is_empty() {
+        return Ok(());
+    }
+
+    let base_path = Path::new(project_path);
+    let script_dir = base_path.join("dev");
+
+    if !script_dir.exists() {
+        fs::create_dir_all(&script_dir)?;
+    }
+
+    let file_path = script_dir.join("custom_lock_clear.h");
+
+    if !file_path.exists() {
+        let mut file = fs::File::create(file_path)?;
+        let template = b"// MTE MK1 (la Churrera)\n// Custom Lock Clear Script\n\n// This code is executed when a lock is removed from the screen.\n// Write your custom C/Assembler code here.\n\n// Example:\n// if (n_pant == 4) {\n//     // Do something special on screen 4\n// }\n";
+        file.write_all(template)?;
+    }
+
+    Ok(())
 }
