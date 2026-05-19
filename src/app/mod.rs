@@ -1,26 +1,27 @@
+mod app_struct;
+mod asset_loader;
+pub mod menu_bar;
 pub mod states;
 pub mod tab_viewer;
-pub mod wizard;
-pub mod menu_bar;
-pub mod toolbar;
-mod app_struct;
 mod theme;
-mod asset_loader;
+pub mod toolbar;
+pub mod wizard;
 
 // Экспортируем структуру приложения наружу для всего остального проекта
 pub use app_struct::ZxIdeApp;
 
+use crate::models::ProjectData;
 use eframe::egui;
 use egui_dock::{DockArea, DockState, Style};
-use states::{Tab, WizardStep, MapEditMode, CustomTab};
-use tab_viewer::ZxTabViewer;
-use crate::models::ProjectData;
 use menu_bar::render_menu_bar;
+use states::{CustomTab, MapEditMode, Tab, WizardStep};
+use tab_viewer::ZxTabViewer;
 use toolbar::render_toolbar;
 
 impl ZxIdeApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let dock_state: Option<DockState<CustomTab>> = cc.storage
+        let dock_state: Option<DockState<CustomTab>> = cc
+            .storage
             .and_then(|storage| eframe::get_value(storage, "dock_state"));
 
         let final_dock_state = dock_state.unwrap_or_else(Self::create_default_layout);
@@ -30,7 +31,8 @@ impl ZxIdeApp {
             current_tab: Tab::MapEditor,
             selected_screen: 0,
             selected_tile: 1,
-            script_text: "ENTERING SCREEN 0\nIF FLAG 1 = 0\nTHEN\n\tSET TILE (5, 5) = 14\nEND".to_string(),
+            script_text: "ENTERING SCREEN 0\nIF FLAG 1 = 0\nTHEN\n\tSET TILE (5, 5) = 14\nEND"
+                .to_string(),
             status_message: "IDE успешно инициализирована".to_string(),
             wizard_active: true,
             wizard_step: WizardStep::WelcomeChoice,
@@ -63,8 +65,10 @@ impl ZxIdeApp {
         let surface = default_state.main_surface_mut();
         let root_node = egui_dock::NodeIndex::root();
 
-        let [top_node, _bottom_node] = surface.split_below(root_node, 0.80, vec![CustomTab::Console]);
-        let [_left_node, _main_work_node] = surface.split_left(top_node, 0.18, vec![CustomTab::ProjectTree]);
+        let [top_node, _bottom_node] =
+            surface.split_below(root_node, 0.80, vec![CustomTab::Console]);
+        let [_left_node, _main_work_node] =
+            surface.split_left(top_node, 0.18, vec![CustomTab::ProjectTree]);
 
         default_state
     }
@@ -100,7 +104,11 @@ impl eframe::App for ZxIdeApp {
 
         // Нижний статус-бар
         egui::TopBottomPanel::bottom("status_bar")
-            .frame(egui::Frame::none().inner_margin(6.0).fill(egui::Color32::from_rgb(22, 22, 26)))
+            .frame(
+                egui::Frame::none()
+                    .inner_margin(6.0)
+                    .fill(egui::Color32::from_rgb(22, 22, 26)),
+            )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(&self.status_message);
@@ -149,7 +157,10 @@ impl eframe::App for ZxIdeApp {
                     .style(dock_style)
                     .show_inside(ui, &mut viewer);
 
-                if let Some(target_tab) = ui.ctx().data_mut(|d| d.remove_temp::<CustomTab>(egui::Id::new("tab_switch_signal"))) {
+                if let Some(target_tab) = ui
+                    .ctx()
+                    .data_mut(|d| d.remove_temp::<CustomTab>(egui::Id::new("tab_switch_signal")))
+                {
                     if let Some(tab_coordinates) = self.dock_state.find_tab(&target_tab) {
                         self.dock_state.set_active_tab(tab_coordinates);
                     }

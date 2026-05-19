@@ -10,14 +10,14 @@ pub fn build_hotspots_source(project: &ProjectData, total_screens: usize) -> Str
 
     for i in 0..total_screens {
         let scr_key = format!("screen_{}", i);
-        
+
         if let Some(screen) = project.screens.get(&scr_key) {
             if screen.hotspot.tp > 0 {
                 // Формула сжатия Mojon Twins: xy = (y * 16) + x
                 let compressed_xy = (screen.hotspot.y * 16) + screen.hotspot.x;
-                
+
                 body.push_str(&format!(
-                    "\t{{{}, {}, 0}}, // Pantalla {}\n", 
+                    "\t{{{}, {}, 0}}, // Pantalla {}\n",
                     compressed_xy, screen.hotspot.tp, i
                 ));
 
