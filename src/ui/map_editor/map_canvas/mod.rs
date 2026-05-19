@@ -57,7 +57,7 @@ pub fn render_map_canvas(
         let painter = ui.painter_at(rect);
 
         // Ввод: Зум (теперь жестко требует Ctrl) и перемещение средней кнопкой
-        camera.handle_zoom(ui, &response);
+        camera.handle_zoom(ui, &response, *selected_screen, map_w);
         let is_pan_drag = camera.handle_pan(ui, &response);
 
         // Ввод: Вычисление ячейки под курсором
@@ -76,14 +76,30 @@ pub fn render_map_canvas(
         if let Some((scr_idx, cell_x, cell_y)) = virtual_cell_pos {
             if *selected_screen != scr_idx {
                 // НАПРАВЛЕНИЕ 1: Клик по НЕАКТИВНОМУ экрану.
-                // Строго проверяем response.clicked() вместо удержания, чтобы исключить каскадный дребезг при сдвиге камеры!
                 if response.clicked_by(egui::PointerButton::Primary) {
+                    // Переводим сквозные индексы в координаты сетки (строки и столбцы)
+                    let old_col = (*selected_screen % map_w) as isize;
+                    let old_row = (*selected_screen / map_w) as isize;
+                    let new_col = (scr_idx % map_w) as isize;
+                    let new_row = (scr_idx / map_w) as isize;
+
+                    // Вычисляем абсолютную разницу шагов по осям X и Y
+                    let col_diff = (old_col - new_col).abs();
+                    let row_diff = (old_row - new_row).abs();
+
+                    // Смежными считаются экраны, если они граничат друг с другом (дистанция <= 1)
+                    let is_adjacent = col_diff <= 1 && row_diff <= 1;
+
+                    // Переключаем активный экран
                     *selected_screen = scr_idx;
-                    screen_changed_by_click = true;
+
+                    // Триггер центрирования взводим ТОЛЬКО если экран далекий (не смежный)
+                    if !is_adjacent {
+                        screen_changed_by_click = true;
+                    }
                 }
             } else {
                 // НАПРАВЛЕНИЕ 2: Действия внутри уже выбраного АКТИВНОГО экрана.
-                // Тут разрешен dragged_by для быстрого непрерывного рисования тайлов кистью.
                 if (response.dragged_by(egui::PointerButton::Primary)
                     || response.clicked_by(egui::PointerButton::Primary))
                     && !ui.ctx().input(|i| i.modifiers.ctrl)
@@ -100,7 +116,6 @@ pub fn render_map_canvas(
                             screen_data.tiles_matrix[index] = *selected_tile;
                         }
                         MapEditMode::Enemies => {
-                            // Спавн врагов делаем строго по clicked(), чтобы не спавнить троих на одной линии при зажатии
                             if response.clicked_by(egui::PointerButton::Primary)
                                 && screen_data.enemies.len() < 3
                             {

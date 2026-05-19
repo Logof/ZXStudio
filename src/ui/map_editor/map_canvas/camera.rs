@@ -32,7 +32,16 @@ impl CanvasCamera {
     }
 
     /// Изменение масштаба работает СТРОГО при зажатом Ctrl + колесико
-    pub fn handle_zoom(&mut self, ui: &egui::Ui, response: &egui::Response) {
+    pub fn handle_zoom(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        selected_screen: usize,
+        map_w: usize,
+    ) {
+        let scr_w_px = 15.0 * 32.0; // 480.0
+        let scr_h_px = 10.0 * 32.0; // 320.0
+
         // Проверяем, находится ли курсор физически над холстом
         let is_mouse_over_canvas = ui.ctx().input(|i| {
             if let Some(pos) = i.pointer.hover_pos() {
@@ -57,18 +66,36 @@ impl CanvasCamera {
             });
 
             if ui.ctx().input(|i| i.modifiers.ctrl) {
-                // НАПРАВЛЕНИЕ 1: Ctrl зажат -> Масштабирование (Зум)
+                // НАПРАВЛЕНИЕ 1: Ctrl зажат -> Масштабирование (Зум) с удержанием фокуса
                 if wheel_y != 0.0 {
+                    // 1. Находим мировые координаты центра ВЫДЕЛЕННОГО экрана (без учета зума)
+                    let scr_col = selected_screen % map_w;
+                    let scr_row = selected_screen / map_w;
+                    let target_world_center_x = (scr_col as f32 * scr_w_px) + (scr_w_px / 2.0);
+                    let target_world_center_y = (scr_row as f32 * scr_h_px) + (scr_h_px / 2.0);
+
+                    // 2. Рассчитываем, в каком конкретно месте холста (в экранных пикселях)
+                    // этот центр находится прямо сейчас, до изменения масштаба
+                    let screen_pos_before_x = target_world_center_x * self.zoom + self.pan.x;
+                    let screen_pos_before_y = target_world_center_y * self.zoom + self.pan.y;
+
+                    // 3. Применяем новый масштаб
+                    let old_zoom = self.zoom;
                     self.zoom = (self.zoom + wheel_y * 0.05).clamp(0.15, 2.0);
+
+                    // 4. Корректируем pan (смещение), чтобы экранная точка центра осталась строго на месте!
+                    if self.zoom != old_zoom {
+                        self.pan.x = screen_pos_before_x - (target_world_center_x * self.zoom);
+                        self.pan.y = screen_pos_before_y - (target_world_center_y * self.zoom);
+                    }
                 }
             } else {
                 // НАПРАВЛЕНИЕ 2: Ctrl НЕ зажат -> Скролл всей карты колесиком мыши
-                // Зажатый Shift инвертирует скролл по горизонтали
                 if ui.ctx().input(|i| i.modifiers.shift) {
-                    self.pan.x += wheel_y * 20.0; // Скорость горизонтального скролла
+                    self.pan.x += wheel_y * 20.0;
                 } else {
-                    self.pan.y += wheel_y * 20.0; // Скорость вертикального скролла
-                    self.pan.x += wheel_x * 20.0; // Поддержка тачпадов и горизонтальных колес
+                    self.pan.y += wheel_y * 20.0;
+                    self.pan.x += wheel_x * 20.0;
                 }
             }
         }
