@@ -1,3 +1,4 @@
+// src/app/tab_viewer.rs
 use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
 use crate::models::{ProjectData, ScreenData};
@@ -6,11 +7,10 @@ use egui_dock::TabViewer;
 
 // Импортируем компоненты UI
 use crate::ui::{render_configurator, render_project_tree, render_script_editor};
-// 🆕 ИСПРАВЛЕНО: Импортируем функцию из нового декомпозированного модуля папки
+// ИСПРАВЛЕНО: Импортируем функцию из нового декомпозированного модуля папки
 use crate::ui::hud_editor::render_hud_editor;
 
 use crate::ui::configurator::ConfigTab;
-use crate::ui::map_editor::render_map_editor;
 
 pub struct ZxTabViewer<'a> {
     pub project: &'a mut ProjectData,
@@ -26,14 +26,9 @@ pub struct ZxTabViewer<'a> {
     pub status_message: &'a str,
     pub map_edit_mode: &'a mut MapEditMode,
     pub selected_enemy_type: &'a mut u8,
-    pub selected_hotspot_type: &'a mut u8,
     pub tileset_texture: &'a Option<egui::TextureHandle>,
     pub sprites_texture: &'a Option<egui::TextureHandle>,
     pub hud_frame_texture: &'a Option<egui::TextureHandle>,
-
-    pub enable_hotspot_items: &'a mut bool,
-    pub enable_hotspot_keys: &'a mut bool,
-    pub enable_hotspot_refills: &'a mut bool,
 }
 
 impl<'a> TabViewer for ZxTabViewer<'a> {
@@ -67,11 +62,22 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             // ============================================================================
-            // КОНСТРУКТОР МИРА: ЗАНИМАЕТ ВСЮ ШИРИНУ БЕЗ ДЕРЕВА
+            // КОНСТРУКТОР МИРА: УНИЧТОЖАЕМ СКРОЛЛ ВКЛАДКИ ДОК-СИСТЕМЫ
             // ============================================================================
             CustomTab::MapCanvas => {
+                // 1. Измеряем точные физические габариты окна, выделенного док-системой
+                let max_size = ui.available_size();
+
+                // 2. Рассчитываем жесткий прямоугольник (Rect) для отрисовки, начиная от текущего курсора
+                let child_rect = egui::Rect::from_min_size(ui.cursor().min, max_size);
+
+                // 3. Создаем изолированную область (Child Ui) с абсолютным позиционированием.
+                // Находясь внутри child_ui, наш редактор карт не может вызвать появление внешних скроллов!
+                let mut child_ui =
+                    ui.child_ui(child_rect, egui::Layout::top_down(egui::Align::LEFT));
+
                 crate::ui::map_editor::render_map_editor(
-                    ui,
+                    &mut child_ui,
                     self.project,
                     self.selected_screen,
                     self.selected_tile,
@@ -81,6 +87,13 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     self.tileset_texture,
                     self.sprites_texture,
                 );
+
+                // 4. Обманываем калькулятор размеров ScrollArea док-системы.
+                // Говорим родителю, что мы якобы вообще не заняли места, чтобы он скрыл полосы прокрутки.
+                ui.advance_cursor_after_rect(egui::Rect::from_min_size(
+                    ui.cursor().min,
+                    egui::Vec2::ZERO,
+                ));
             }
 
             CustomTab::ScriptEditor => {

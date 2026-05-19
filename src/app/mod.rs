@@ -150,13 +150,9 @@ impl eframe::App for ZxIdeApp {
                     status_message: &self.status_message,
                     map_edit_mode: &mut self.map_edit_mode,
                     selected_enemy_type: &mut self.selected_enemy_type,
-                    selected_hotspot_type: &mut self.selected_hotspot_type,
                     tileset_texture: &self.tileset_texture,
                     sprites_texture: &self.sprites_texture,
                     hud_frame_texture: &self.hud_frame_texture,
-                    enable_hotspot_items: &mut self.enable_hotspot_items,
-                    enable_hotspot_keys: &mut self.enable_hotspot_keys,
-                    enable_hotspot_refills: &mut self.enable_hotspot_refills,
                 };
 
                 DockArea::new(&mut self.dock_state)

@@ -16,17 +16,6 @@ pub fn render(
 ) {
     ui.vertical(|ui| {
         let max_screens = (project.config.map_goals.map_w * project.config.map_goals.map_h) as usize - 1;
-
-        // Блок навигации НАД холстом
-        ui.horizontal(|ui| {
-            ui.label("🗺️ Экран:");
-            ui.add(egui::Slider::new(selected_screen, 0..=max_screens).show_value(true).text(format!("/ {}", max_screens)));
-
-            if ui.button("◀").clicked() && *selected_screen > 0 { *selected_screen -= 1; }
-            if ui.button("▶").clicked() && *selected_screen < max_screens { *selected_screen += 1; }
-        });
-        ui.add_space(6.0);
-
         // Отрисовка холста карты
         render_map_canvas(
             ui,
