@@ -10,3 +10,5 @@ serde_json = "1.0"
 image = "0.24.2"
 egui_dock = { version = "=0.10.0", features = ["serde"] }
 chrono = "0.4"
+rfd = "0.14"
+font-kit = "0.14"

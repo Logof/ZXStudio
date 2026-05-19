@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Clone, Copy)]
-pub enum Tab { MapEditor, ScriptEditor, Configurator }
+pub enum Tab { MapEditor, ScriptEditor, Configurator, HudEditor }
 
-pub enum WizardStep { SelectPlatform, ConfigureWorld }
+pub enum WizardStep { WelcomeChoice, NameAndPath, SelectPlatform, ConfigureWorld }
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum MapEditMode {
@@ -17,5 +17,6 @@ pub enum CustomTab {
     MapCanvas,
     ScriptEditor,
     Configurator,
+    HudEditor,
     Console,
 }

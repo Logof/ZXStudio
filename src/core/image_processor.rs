@@ -1,5 +1,6 @@
 use image::{GenericImage, GenericImageView, Rgb, RgbImage};
 use std::path::Path;
+use eframe::egui;
 
 /// Импорт тайлсета: читает work.png, зануляет тайл 0 (16x16) и сохраняет mappy.png
 pub fn process_tileset_for_mappy(source_path: &str, target_path: &str) -> Result<(), image::ImageError> {
@@ -10,7 +11,7 @@ pub fn process_tileset_for_mappy(source_path: &str, target_path: &str) -> Result
         )));
     }
     let img = image::open(source_path)?;
-    let mut rgb_img: RgbImage = img.to_rgb8(); // ФИКС: Исправлено RgbImg на RgbImage
+    let mut rgb_img: RgbImage = img.to_rgb8();
     
     // Зануляем область тайла 0 (координаты X: 0..16, Y: 0..16) в черный цвет
     for y in 0..16 {
@@ -73,4 +74,43 @@ pub fn generate_sprite_masks(sprites_path: &str) -> Result<(), image::ImageError
 
     output_img.save(sprites_path)?;
     Ok(())
+}
+
+// ============================================================================
+// ДОБАВЛЕНО: Утилита фоновой конвертации для egui видеотекстур
+// ============================================================================
+pub fn load_png_to_image<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, String> {
+    let img = image::open(path).map_err(|e| format!("Ошибка чтения PNG: {}", e))?;
+    let size = [img.width() as usize, img.height() as usize];
+    let rgba_pixels = img.to_rgba8().into_raw();
+    
+    Ok(egui::ColorImage::from_rgba_unmultiplied(size, &rgba_pixels))
+}
+
+
+pub fn load_work_png_to_image_ram<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, String> {
+    // 1. Открываем оригинальный work.png
+    let img = image::open(path).map_err(|e| format!("Ошибка чтения PNG: {}", e))?;
+    let mut rgb_img = img.to_rgb8();
+
+    // 2. Монолитно зануляем область Тайла 0 в оперативной памяти
+    for y in 0..16 {
+        for x in 0..16 {
+            rgb_img.put_pixel(x, y, Rgb([0, 0, 0]));
+        }
+    }
+
+    // 3. Конвертируем модифицированный буфер в формат RGBA, который ожидает egui
+    let size = [rgb_img.width() as usize, rgb_img.height() as usize];
+    
+    // Создаем вектор пикселей с альфа-каналом (ставим opaque непрозрачность 255)
+    let mut rgba_pixels = Vec::with_capacity(size[0] * size[1] * 4);
+    for pixel in rgb_img.pixels() {
+        rgba_pixels.push(pixel[0]);
+        rgba_pixels.push(pixel[1]);
+        rgba_pixels.push(pixel[2]);
+        rgba_pixels.push(255); // Непрозрачный альфа-канал
+    }
+
+    Ok(egui::ColorImage::from_rgba_unmultiplied(size, &rgba_pixels))
 }

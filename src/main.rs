@@ -8,10 +8,7 @@ use std::fs;
 
 fn main() -> Result<(), eframe::Error> {
     // Создаем системные каталоги ТЗ
-    let _ = fs::create_dir_all("map");
-    let _ = fs::create_dir_all("dev");
     let _ = fs::create_dir_all("templates");
-    let _ = fs::create_dir_all("gfx");
 
     let template_path = "templates/config.h.template";
     if !std::path::Path::new(template_path).exists() {
@@ -23,7 +20,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: eframe::egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
         ..Default::default()
     };
-    
+
     eframe::run_native(
         "ZX Spectrum 48K/128K Единая Среда Разработки (Rust + egui)",
         options,

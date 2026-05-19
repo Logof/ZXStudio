@@ -1,5 +1,5 @@
 use eframe::egui;
-use super::mod_struct::ZxIdeApp;
+use super::ZxIdeApp;
 use crate::core::{save_project_json, export_config_h, export_enems_h, validator::validate_attribute_clash, image_processor::{process_tileset_for_mappy, generate_sprite_masks}};
 
 pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
@@ -8,18 +8,24 @@ pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("💾 Сохранить JSON").clicked() {
-                    let _ = save_project_json(&app.project);
-                    app.status_message = "Проект сохранен".to_string();
+                    match save_project_json(&app.project_path, &app.project_name, &app.project) {
+                        Ok(_) => {
+                            app.status_message = format!("✅ Проект успешно сохранен в {}{}.prj!", &app.project_path, &app.project_name);
+                        }
+                        Err(err) => {
+                            app.status_message = format!("❌ Ошибка сохранения проекта: {}", err);
+                        }
+                    }
                 }
-                
+
                 if ui.button("⚙️ Экспорт Ресурсов").on_hover_text("Сгенерировать config.h и enems.h для Си-компилятора").clicked() {
                     let mut success = true;
-                    if let Err(e) = export_config_h(&app.project) {
+                    if let Err(e) = export_config_h(&app.project_path, &app.project) {
                         app.status_message = format!("Ошибка config.h: {}", e);
                         success = false;
                     }
                     if success {
-                        if let Err(e) = export_enems_h(&app.project) {
+                        if let Err(e) = export_enems_h(&app.project_path, &app.project) {
                             app.status_message = format!("Ошибка enems.h: {}", e);
                             success = false;
                         }
@@ -33,7 +39,7 @@ pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
                     let mut success = true;
                     if let Err(e) = process_tileset_for_mappy("gfx/work.png", "gfx/mappy.png") { success = false; }
                     if success { if let Err(_) = generate_sprite_masks("gfx/sprites.png") { success = false; } }
-                    
+
                     if success {
                         if let Ok(img) = image::open("gfx/mappy.png") {
                             let rgb_img = img.to_rgba8();

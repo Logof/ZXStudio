@@ -6,17 +6,20 @@ use crate::models::{ProjectData, ScreenData};
 
 // Импортируем компоненты UI
 /*use crate::ui::{
-    render_map_canvas, render_palette_tiles, render_palette_enemies, 
+    render_map_canvas, render_palette_tiles, render_palette_enemies,
     render_script_editor, render_configurator, render_project_tree
 };*/
 use crate::ui::{
-    render_script_editor, render_configurator, render_project_tree
+    render_script_editor, render_configurator, render_project_tree, render_hud_editor
 };
 
 use crate::ui::map_editor::render_map_editor;
 
 pub struct ZxTabViewer<'a> {
     pub project: &'a mut ProjectData,
+    pub project_name: &'a str,
+    pub project_path: &'a str,
+
     pub selected_screen: &'a mut usize,
     pub selected_tile: &'a mut u8,
     pub script_text: &'a mut String,
@@ -25,8 +28,9 @@ pub struct ZxTabViewer<'a> {
     pub map_edit_mode: &'a mut MapEditMode,
     pub selected_enemy_type: &'a mut u8,
     pub selected_hotspot_type: &'a mut u8,
-    pub tileset_texture: &'a Option<egui::TextureHandle>, 
+    pub tileset_texture: &'a Option<egui::TextureHandle>,
     pub sprites_texture: &'a Option<egui::TextureHandle>,
+    pub hud_frame_texture: &'a Option<egui::TextureHandle>,
 
     pub enable_hotspot_items: &'a mut bool,
     pub enable_hotspot_keys: &'a mut bool,
@@ -43,6 +47,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             CustomTab::ScriptEditor => "📜 Редактор скриптов".into(),
             CustomTab::Configurator => "⚙️ Настройки движка".into(),
             CustomTab::Console => "💻 Логи компиляции".into(),
+            CustomTab::HudEditor => "📺 HUD-Конструктор".into(),
         }
     }
 
@@ -54,7 +59,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
         match tab {
             // 📑 НОВЫЙ КЕЙС: ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
             CustomTab::ProjectTree => {
-                if let Some(target_tab) = render_project_tree(ui) {
+                if let Some(target_tab) = render_project_tree(ui, &self.project_path) {
                     ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab));
                 }
             }
@@ -75,9 +80,10 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     self.sprites_texture,
                 );
             }
-            
+
             CustomTab::ScriptEditor => { render_script_editor(ui, self.script_text, *self.selected_screen); }
             CustomTab::Configurator => { render_configurator(ui, self.project); }
+            CustomTab::HudEditor => { render_hud_editor(ui, self.project, &self.hud_frame_texture); }
             CustomTab::Console => {
                 ui.heading("Логи сборки проекта");
                 ui.colored_label(egui::Color32::LIGHT_BLUE, self.status_message);
