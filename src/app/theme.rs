@@ -1,48 +1,62 @@
 use eframe::egui;
-use font_kit::source::SystemSource;
-use font_kit::properties::Properties;
-use font_kit::family_name::FamilyName;
 
 pub fn apply_modern_dark_theme(ctx: &egui::Context) {
-    let mut font_definitions = egui::FontDefinitions::default();
-    let mut font_loaded = false;
-
-    if let Ok(font) = SystemSource::new().select_best_match(
-        &[FamilyName::SansSerif, FamilyName::Title("Arial".to_string())],
-        &Properties::new()
-    ) {
-        if let Ok(handle) = font.load() {
-            if let Some(raw_data) = handle.copy_font_data() {
-                let font_data = egui::FontData::from_owned((*raw_data).clone());
-                font_definitions.font_data.insert("system_sans".to_owned(), font_data);
-                font_definitions.families.get_mut(&egui::FontFamily::Proportional)
-                    .unwrap()
-                    .insert(0, "system_sans".to_owned());
-                font_loaded = true;
-            }
-        }
-    }
-
-    if font_loaded {
-        ctx.set_fonts(font_definitions);
-    }
-
+    // 1. НАСТРОЙКА ИДЕАЛЬНОЙ СЕТКИ РАЗМЕРОВ ШРИФТОВ (Баланс пропорций)
     let mut style = (*ctx.style()).clone();
-    style.text_styles.insert(egui::TextStyle::Small, egui::FontId::proportional(13.0));
-    style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(16.0));
-    style.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(15.0));
-    style.text_styles.insert(egui::TextStyle::Heading, egui::FontId::proportional(22.0));
-    style.text_styles.insert(egui::TextStyle::Monospace, egui::FontId::monospace(15.5));
+
+    // Делаем интерфейс более аккуратным и собранным (размеры в пунктах)
+    style
+        .text_styles
+        .insert(egui::TextStyle::Small, egui::FontId::proportional(11.0));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0)); // Текст по умолчанию
+    style
+        .text_styles
+        .insert(egui::TextStyle::Button, egui::FontId::proportional(13.5)); // Кнопки и чекбоксы
+    style
+        .text_styles
+        .insert(egui::TextStyle::Heading, egui::FontId::proportional(18.0)); // Заголовки страниц
+    style
+        .text_styles
+        .insert(egui::TextStyle::Monospace, egui::FontId::monospace(14.0)); // Код скриптов и логи
+
+    // Добавим кастомный стиль для второстепенных подзаголовков панелей
+    style.text_styles.insert(
+        egui::TextStyle::Name("Subheading".into()),
+        egui::FontId::proportional(15.0),
+    );
+
+    // Настройка отступов для более воздушного, но плотного UI
+    style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+    style.spacing.window_margin = egui::Margin::same(10.0);
+
     ctx.set_style(style);
 
+    // 2. СТИЛИЗАЦИЯ ВИЗУАЛЬНЫХ ЭЛЕМЕНТОВ (Современная темная тема)
     let mut visuals = egui::Visuals::dark();
-    visuals.panel_fill = egui::Color32::from_rgb(14, 14, 17);
-    visuals.window_fill = egui::Color32::from_rgb(20, 20, 25);
-    visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(28, 28, 33);
-    visuals.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(180, 180, 190);
-    visuals.widgets.inactive.rounding = egui::Rounding::same(0.0);
-    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(38, 38, 45);
+
+    // Цветовая палитра: глубокий темно-серый без синевы (Меньше устают глаза)
+    visuals.panel_fill = egui::Color32::from_rgb(18, 18, 22); // Задний фон панелей
+    visuals.window_fill = egui::Color32::from_rgb(26, 26, 32); // Фон всплывающих окон
+
+    // Настройка неактивных виджетов (Поля ввода, неактивные кнопки)
+    visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(32, 32, 40);
+    visuals.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(170, 172, 180);
+    visuals.widgets.inactive.rounding = egui::Rounding::same(3.0); // Мягкое, едва заметное скругление кнопок
+
+    // Настройка элементов при наведении мыши (Hover)
+    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(44, 44, 55);
     visuals.widgets.hovered.fg_stroke.color = egui::Color32::WHITE;
-    visuals.selection.bg_fill = egui::Color32::from_rgb(0, 150, 255);
+    visuals.widgets.hovered.rounding = egui::Rounding::same(3.0);
+
+    // Настройка активных виджетов (Клик, фокус)
+    visuals.widgets.active.bg_fill = egui::Color32::from_rgb(0, 130, 230);
+    visuals.widgets.active.fg_stroke.color = egui::Color32::WHITE;
+    visuals.widgets.active.rounding = egui::Rounding::same(3.0);
+
+    // Цвет выделения текста и активных вкладок (Фирменный Cyan/Blue)
+    visuals.selection.bg_fill = egui::Color32::from_rgb(0, 120, 215);
+
     ctx.set_visuals(visuals);
 }

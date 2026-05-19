@@ -79,7 +79,7 @@
 // V. БОЕВАЯ СИСТЕМА ДАЛЬНЕГО БОЯ (SHOOTING ENGINE - ONLY SIDE VIEW)
 // ----------------------------------------------------------------------------
 {{TOGGLE_PLAYER_CAN_FIRE}}               // If defined, shooting engine is enabled.
-#define PLAYER_BULLET_SPEED      {{PLAYER_BULLET_SPEED}}   // Pixels/frame. 
+#define PLAYER_BULLET_SPEED      {{PLAYER_BULLET_SPEED}}   // Pixels/frame.
 #define MAX_BULLETS              {{MAX_BULLETS}}           // Max number of bullets on screen.
 #define PLAYER_BULLET_Y_OFFSET   {{PLAYER_BULLET_Y_OFFSET}} // vertical offset from the player's top.
 #define PLAYER_AX_RECOIL         {{PLAYER_AX_RECOIL}}      // If defined, recoil.
@@ -136,7 +136,7 @@
 {{TOGGLE_RANDOM_RESPAWN}}                // If defined, automatic flying enemies spawn on killed enemies
 {{TOGGLE_USE_TYPE_6}}                    // If defined, type 6 enemies are enabled.
 {{TOGGLE_USE_SIGHT_DISTANCE}}            // If defined, type 6 only pursue you within sight distance
-#define SIGHT_DISTANCE           {{SIGHT_DISTANCE}}        
+#define SIGHT_DISTANCE           {{SIGHT_DISTANCE}}
 #define FANTY_MAX_V              {{FANTY_MAX_V}}           // Flying enemies max speed.
 #define FANTY_A                  {{FANTY_A}}               // Flying enemies acceleration.
 #define FANTIES_LIFE_GAUGE       {{FANTIES_LIFE_GAUGE}}    // Amount of shots needed to kill flying enemies.
@@ -223,7 +223,7 @@
 {{TOGGLE_ROW_MAP}}                       // Do not check vertical screen flicks
 {{TOGGLE_NO_ALT_BG}}                     // No alternative tile 19 for bg = 0
 {{TOGGLE_NO_MAX_ENEMS}}                  // Less than 3 enems in some screens
-{{TOGGLE_PLAYER_ALTERNATE_ANIMATION}}    // If defined, animation is 1,2,3,1,2,3... 
+{{TOGGLE_PLAYER_ALTERNATE_ANIMATION}}    // If defined, animation is 1,2,3,1,2,3...
 {{TOGGLE_TWO_SETS}}                      // If defined, two sets of tiles.
 {{TOGGLE_TWO_SETS_REAL}}                 // Tiles have their real value in map_buff
 #define TWO_SETS_CONDITION       {{TWO_SETS_CONDITION}} // Rule for tileset activation

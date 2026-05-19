@@ -1,8 +1,8 @@
-use eframe::egui;
-use egui_dock::TabViewer;
 use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
 use crate::models::{ProjectData, ScreenData};
+use eframe::egui;
+use egui_dock::TabViewer;
 
 // Импортируем компоненты UI
 /*use crate::ui::{
@@ -10,9 +10,10 @@ use crate::models::{ProjectData, ScreenData};
     render_script_editor, render_configurator, render_project_tree
 };*/
 use crate::ui::{
-    render_script_editor, render_configurator, render_project_tree, render_hud_editor
+    render_configurator, render_hud_editor, render_project_tree, render_script_editor,
 };
 
+use crate::ui::configurator::ConfigTab;
 use crate::ui::map_editor::render_map_editor;
 
 pub struct ZxTabViewer<'a> {
@@ -20,6 +21,7 @@ pub struct ZxTabViewer<'a> {
     pub project_name: &'a str,
     pub project_path: &'a str,
 
+    pub configurator_tab: &'a mut ConfigTab,
     pub selected_screen: &'a mut usize,
     pub selected_tile: &'a mut u8,
     pub script_text: &'a mut String,
@@ -53,14 +55,17 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         if let Some(tex) = self.tileset_texture {
-            ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("tileset_tex"), tex.clone()));
+            ui.ctx()
+                .data_mut(|d| d.insert_temp(egui::Id::new("tileset_tex"), tex.clone()));
         }
 
         match tab {
             // 📑 НОВЫЙ КЕЙС: ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
             CustomTab::ProjectTree => {
                 if let Some(target_tab) = render_project_tree(ui, &self.project_path) {
-                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab));
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab)
+                    });
                 }
             }
 
@@ -68,7 +73,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             // ОБНОВЛЕННЫЙ КОНСТРУКТОР МИРА: ТЕПЕРЬ ЗАНИМАЕТ ВСЮ ШИРИНУ БЕЗ ДЕРЕВА
             // ============================================================================
             CustomTab::MapCanvas => {
-                 crate::ui::map_editor::render_map_editor(
+                crate::ui::map_editor::render_map_editor(
                     ui,
                     self.project,
                     self.selected_screen,
@@ -81,9 +86,15 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 );
             }
 
-            CustomTab::ScriptEditor => { render_script_editor(ui, self.script_text, *self.selected_screen); }
-            CustomTab::Configurator => { render_configurator(ui, self.project); }
-            CustomTab::HudEditor => { render_hud_editor(ui, self.project, &self.hud_frame_texture); }
+            CustomTab::ScriptEditor => {
+                render_script_editor(ui, self.script_text, *self.selected_screen);
+            }
+            CustomTab::Configurator => {
+                render_configurator(ui, self.project, self.configurator_tab);
+            }
+            CustomTab::HudEditor => {
+                render_hud_editor(ui, self.project, &self.hud_frame_texture);
+            }
             CustomTab::Console => {
                 ui.heading("Логи сборки проекта");
                 ui.colored_label(egui::Color32::LIGHT_BLUE, self.status_message);

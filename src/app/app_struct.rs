@@ -1,7 +1,8 @@
-use egui_dock::DockState;
-use crate::models::ProjectData;
+use super::states::{CustomTab, MapEditMode, Tab, WizardStep};
 use crate::core::validator::ClashError;
-use super::states::{Tab, WizardStep, MapEditMode, CustomTab};
+use crate::models::ProjectData;
+use crate::ui::configurator::ConfigTab;
+use egui_dock::DockState;
 
 pub struct ZxIdeApp {
     pub project: ProjectData,
@@ -30,4 +31,6 @@ pub struct ZxIdeApp {
 
     pub project_name: String,
     pub project_path: String,
+
+    pub configurator_tab: ConfigTab,
 }

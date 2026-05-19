@@ -1,7 +1,7 @@
+use super::config::{EngineViewMode, PhysicsConfig};
+use super::screen::ScreenData;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::screen::ScreenData;
-use super::config::{PhysicsConfig, EngineViewMode};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProjectData {
@@ -32,8 +32,10 @@ impl Default for ProjectData {
         // Забиваем дефолтный Си-массив поведения, который вы прислали в конце файла:
         // 0 = Walkable, 1 = Kills, 8 = Full Obstacle
         let default_behaviours = vec![
-            0, 0, 8, 8, 8, 8, 1, 1, 8, 0, 1, 8, 0, 8, 8, 8, // Строка 0 (тайлы 0..15)
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // Строка 1 (тайлы 16..31)
+            0, 0, 8, 8, 8, 8, 1, 1, 8, 0, 1, 8, 0, 8, 8,
+            8, // Строка 0 (тайлы 0..15)
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, // Строка 1 (тайлы 16..31)
         ];
 
         Self {
@@ -53,7 +55,6 @@ impl Default for ProjectData {
             role_alt_bg_active: false,
 
             tile_behaviours: default_behaviours,
-            
         }
     }
 }

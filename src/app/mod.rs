@@ -53,6 +53,9 @@ impl ZxIdeApp {
 
             project_name: "my_retro_game".to_string(),
             project_path: String::new(),
+
+            // Синхронизировано с обновленным перечислением ConfigTab
+            configurator_tab: crate::ui::configurator::ConfigTab::General,
         }
     }
 
@@ -113,7 +116,9 @@ impl eframe::App for ZxIdeApp {
                 ui.horizontal(|ui| {
                     ui.label(&self.status_message);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let numblocks = (16 * 10) + (self.project.config.engine.max_bullets * 5);
+                        // ИСПРАВЛЕНО: Изменен путь адресации max_bullets под новую структуру данных
+                        let numblocks =
+                            (16 * 10) + (self.project.config.shooting_boxes.max_bullets * 5);
                         ui.label(format!("NUMBLOCKS: {}", numblocks));
                     });
                 });
@@ -137,6 +142,7 @@ impl eframe::App for ZxIdeApp {
                     project: &mut self.project,
                     project_name: &self.project_name,
                     project_path: &self.project_path,
+                    configurator_tab: &mut self.configurator_tab,
                     selected_screen: &mut self.selected_screen,
                     selected_tile: &mut self.selected_tile,
                     script_text: &mut self.script_text,

@@ -1,8 +1,8 @@
-use eframe::egui;
-use crate::models::ProjectData;
-use crate::core::validator::ClashError;
-use crate::app::states::MapEditMode;
 use super::map_canvas::render_map_canvas;
+use crate::app::states::MapEditMode;
+use crate::core::validator::ClashError;
+use crate::models::ProjectData;
+use eframe::egui;
 
 pub fn render(
     ui: &mut egui::Ui,
@@ -19,7 +19,7 @@ pub fn render(
 
         // Блок навигации НАД холстом
         ui.horizontal(|ui| {
-            ui.label("🗺️ Текущий экран:");
+            ui.label("🗺️ Экран:");
             ui.add(egui::Slider::new(selected_screen, 0..=max_screens).show_value(true).text(format!("/ {}", max_screens)));
 
             if ui.button("◀").clicked() && *selected_screen > 0 { *selected_screen -= 1; }
@@ -44,7 +44,7 @@ pub fn render(
         if let Some(screen_data) = project.screens.get_mut(&scr_key) {
             if !screen_data.enemies.is_empty() && *map_edit_mode == MapEditMode::Enemies {
                 ui.add_space(6.0);
-                
+
                 let count = screen_data.enemies.len();
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
@@ -55,19 +55,19 @@ pub fn render(
                         );
                     });
                     ui.add_space(2.0);
-                    
+
                     let mut to_remove = None;
 
                     for (idx, enemy) in screen_data.enemies.iter_mut().enumerate() {
                         ui.group(|ui| {
                             ui.horizontal(|ui| {
                                 ui.colored_label(egui::Color32::from_rgb(180, 50, 255), format!("[Слот {}]", idx + 1));
-                                
+
                                 // Вычисление HEX-кода спрайта для совместимости с ponedor.exe (8, 10, 12, 14)
                                 let raw_gfx_id = 8 + (enemy.tp % 4) * 2;
                                 ui.label(format!("Графика: Спрайт 0x{:X}", raw_gfx_id));
                                 ui.small(format!("Старт: ({}, {})", enemy.x, enemy.y));
-                                
+
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                     if ui.button("🗑").clicked() { to_remove = Some(idx); }
                                 });
@@ -88,7 +88,7 @@ pub fn render(
 
                             ui.horizontal(|ui| {
                                 ui.small("🧠 Поведение ИИ:");
-                                
+
                                 let mut new_ai = current_ai_mode;
                                 egui::ComboBox::from_id_source(format!("ai_combo_calc_{}", idx))
                                     .selected_text(match current_ai_mode {
