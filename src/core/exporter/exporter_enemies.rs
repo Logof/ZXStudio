@@ -10,7 +10,7 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
 
     for i in 0..total_screens {
         let scr_key = format!("screen_{}", i);
-        body.push_str(&format!("\t// Pantalla {}\n", i));
+        body.push_str(&format!("\t// Screen {}\n", i));
 
         if let Some(screen) = project.screens.get(&scr_key) {
             for enemy in &screen.enemies {

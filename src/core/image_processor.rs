@@ -1,9 +1,12 @@
-use image::{GenericImage, GenericImageView, Rgb, RgbImage};
-use std::path::Path;
 use eframe::egui;
+use image::{Rgb, RgbImage};
+use std::path::Path;
 
 /// Импорт тайлсета: читает work.png, зануляет тайл 0 (16x16) и сохраняет mappy.png
-pub fn process_tileset_for_mappy(source_path: &str, target_path: &str) -> Result<(), image::ImageError> {
+pub fn process_tileset_for_mappy(
+    source_path: &str,
+    target_path: &str,
+) -> Result<(), image::ImageError> {
     if !Path::new(source_path).exists() {
         return Err(image::ImageError::IoError(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -12,7 +15,7 @@ pub fn process_tileset_for_mappy(source_path: &str, target_path: &str) -> Result
     }
     let img = image::open(source_path)?;
     let mut rgb_img: RgbImage = img.to_rgb8();
-    
+
     // Зануляем область тайла 0 (координаты X: 0..16, Y: 0..16) в черный цвет
     for y in 0..16 {
         for x in 0..16 {
@@ -39,7 +42,10 @@ pub fn generate_sprite_masks(sprites_path: &str) -> Result<(), image::ImageError
     if height != 32 || width != 256 {
         return Err(image::ImageError::IoError(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("Неверный размер sprites.png! Ожидалось 256x32, получено {}x{}", width, height),
+            format!(
+                "Неверный размер sprites.png! Ожидалось 256x32, получено {}x{}",
+                width, height
+            ),
         )));
     }
 
@@ -59,11 +65,12 @@ pub fn generate_sprite_masks(sprites_path: &str) -> Result<(), image::ImageError
                     let pixel_color = rgb_img.get_pixel(px_x, row_y + y);
 
                     // Спецификация Mojon Twins: RGB(0,0,0) — пустой фон, остальное — тело объекта
-                    let mask_pixel = if pixel_color[0] == 0 && pixel_color[1] == 0 && pixel_color[2] == 0 {
-                        Rgb([255, 255, 255]) // Белый цвет маски указывает Спектруму на прозрачность
-                    } else {
-                        Rgb([0, 0, 0])       // Черный цвет маски вырезает силуэт под наложение
-                    };
+                    let mask_pixel =
+                        if pixel_color[0] == 0 && pixel_color[1] == 0 && pixel_color[2] == 0 {
+                            Rgb([255, 255, 255]) // Белый цвет маски указывает Спектруму на прозрачность
+                        } else {
+                            Rgb([0, 0, 0]) // Черный цвет маски вырезает силуэт под наложение
+                        };
 
                     // Записываем сгенерированный пиксель маски в соседнее правое окно 16x16
                     output_img.put_pixel(mask_start_x + x, row_y + y, mask_pixel);
@@ -83,10 +90,9 @@ pub fn load_png_to_image<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, St
     let img = image::open(path).map_err(|e| format!("Ошибка чтения PNG: {}", e))?;
     let size = [img.width() as usize, img.height() as usize];
     let rgba_pixels = img.to_rgba8().into_raw();
-    
+
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &rgba_pixels))
 }
-
 
 pub fn load_work_png_to_image_ram<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, String> {
     // 1. Открываем оригинальный work.png
@@ -102,7 +108,7 @@ pub fn load_work_png_to_image_ram<P: AsRef<Path>>(path: P) -> Result<egui::Color
 
     // 3. Конвертируем модифицированный буфер в формат RGBA, который ожидает egui
     let size = [rgb_img.width() as usize, rgb_img.height() as usize];
-    
+
     // Создаем вектор пикселей с альфа-каналом (ставим opaque непрозрачность 255)
     let mut rgba_pixels = Vec::with_capacity(size[0] * size[1] * 4);
     for pixel in rgb_img.pixels() {

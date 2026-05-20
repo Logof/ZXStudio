@@ -17,7 +17,7 @@ pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> Strin
                 let compressed_xy = (screen.hotspot.y * 16) + screen.hotspot.x;
 
                 body.push_str(&format!(
-                    "\t{{{}, {}, 0}}, // Pantalla {}\n",
+                    "\t{{{}, {}, 0}}, // Screen {}\n",
                     compressed_xy, screen.hotspot.tp, i
                 ));
 
@@ -26,11 +26,11 @@ pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> Strin
                 }
             } else {
                 // Если хотспота нет — пишем пустую Си-заглушку, увеличивая счетчик типа 0
-                body.push_str(&format!("\t{{0, 0, 0}}, // Pantalla {} пуста\n", i));
+                body.push_str(&format!("\t{{0, 0, 0}}, // Screen {} пуста\n", i));
                 n_hotspots_type[0] += 1;
             }
         } else {
-            body.push_str(&format!("\t{{0, 0, 0}}, // Pantalla {} пуста\n", i));
+            body.push_str(&format!("\t{{0, 0, 0}}, // Screen {} пуста\n", i));
             n_hotspots_type[0] += 1;
         }
     }
