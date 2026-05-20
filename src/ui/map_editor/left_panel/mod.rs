@@ -1,6 +1,6 @@
-use eframe::egui;
 use crate::app::states::MapEditMode;
 use crate::models::ProjectData;
+use eframe::egui;
 
 mod enemies_palette;
 mod tiles_palette;
@@ -8,7 +8,7 @@ mod tiles_palette;
 pub fn render(
     ui: &mut egui::Ui,
     project: &mut ProjectData,
-    _selected_screen: usize,
+    selected_screen: usize,
     map_edit_mode: &mut MapEditMode,
     selected_tile: &mut u8,
     selected_enemy_sprite_slot: &mut u8,
@@ -40,7 +40,13 @@ pub fn render(
                             tiles_palette::render(ui, project, selected_tile, tileset_texture);
                         }
                         MapEditMode::Enemies => {
-                            enemies_palette::render(ui, project, selected_enemy_sprite_slot, sprites_texture);
+                            enemies_palette::render(
+                                ui,
+                                project,
+                                selected_enemy_sprite_slot,
+                                sprites_texture,
+                                selected_screen,
+                            );
                         }
                     }
                 });

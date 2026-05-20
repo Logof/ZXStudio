@@ -1,12 +1,16 @@
-use crate::models::ProjectData;
+// src/ui/map_editor/left_panel/enemies_palette.rs
+use crate::models::{enemy_ai::EnemyAiType, screen::ScreenData, ProjectData};
 use eframe::egui;
 
 pub fn render(
     ui: &mut egui::Ui,
-    project: &ProjectData,
+    project: &mut ProjectData, // Меняем на изменяемую ссылку, чтобы левая панель могла напрямую править врага!
     selected_enemy_sprite_slot: &mut u8,
     sprites_texture: &Option<egui::TextureHandle>,
+    selected_screen: usize, // 🔥 Передаем индекс текущей комнаты
 ) {
+    let is_top_down = project.config.movement_controls.player_genital;
+
     ui.label("Палитра графики (sprites.png):");
     ui.add_space(4.0);
 
@@ -16,7 +20,7 @@ pub fn render(
         (2, "👾 Враг Слота 3 (Спрайт 12)", 12),
     ];
 
-    if project.config.movement_controls.player_genital {
+    if is_top_down {
         sprite_slots.push((3, "👾 Враг Слота 4 (Спрайт 14)", 14));
     } else {
         sprite_slots.push((3, "🧗 Движ. Платформа (Спрайт 14)", 14));
@@ -66,77 +70,84 @@ pub fn render(
         }
     });
 
-    ui.add_space(8.0);
+    // ============================================================================
+    // 🔥 ПРОМЫШЛЕННЫЙ ИНСПЕКТОР СВОЙСТВ ВЫДЕЛЕННОГО ВРАГА (ВМЕСТО ЗАВИСАЮЩИХ ОКON)
+    // ============================================================================
+    ui.add_space(10.0);
     ui.separator();
     ui.add_space(4.0);
 
-    // Извлекаем или инициализируем дефолтный тип ИИ (по умолчанию = 1)
-    let id_ai = egui::Id::new("default_enemy_ai_type_ctx");
-    let mut current_default_ai = ui.ctx().data(|d| d.get_temp::<u8>(id_ai)).unwrap_or(1);
+    let id_context_enemy = egui::Id::new("inspector_selected_enemy_id");
+    let selected_enemy_id: Option<u64> = ui.ctx().data(|d| d.get_temp(id_context_enemy));
 
-    // ВЫПАДАЮЩИЙ СПИСОК ТИПОВ ПОВЕДЕНИЯ ДВИЖКА (Capítulo 5)
-    ui.group(|ui| {
-        ui.label("🧠 Поведение по умолчанию при спавне:");
+    if let Some(target_id) = selected_enemy_id {
+        let active_scr_key = format!("screen_{}", selected_screen);
 
-        egui::ComboBox::from_id_source("default_ai_combobox")
-            .selected_text(match current_default_ai {
-                1..=4 => format!("Тип {} (0x{:02X}) - Линейный", current_default_ai, current_default_ai),
-                5 => "Тип 5 (0x05) - Random Respawn".to_string(),
-                6 => "Тип 6 (0x06) - Fanties Призрак".to_string(),
-                7..=10 => format!("Тип {} (0x{:02X}) - Куадратор", current_default_ai, current_default_ai),
-                11..=14 => format!("Тип {} (0x{:02X}) - Маррулер", current_default_ai, current_default_ai),
-                _ => format!("Тип {}", current_default_ai)
-            })
-            .show_ui(ui, |ui| {
-                ui.label("Линейные траектории:");
-                ui.selectable_value(&mut current_default_ai, 1, "Тип 1 (0x01): Линейный ИИ");
-                ui.selectable_value(&mut current_default_ai, 2, "Тип 2 (0x02): Линейный ИИ");
-                ui.selectable_value(&mut current_default_ai, 3, "Тип 3 (0x03): Линейный ИИ");
-                let t4_name = if project.config.movement_controls.player_genital {
-                    "Тип 4 (0x04): Линейный ИИ"
-                } else {
-                    "Тип 4 (0x04): Платформа / Лифт"
-                };
+        if let Some(screen_data) = project.screens.get_mut(&active_scr_key) {
+            if let Some(enemy_idx) = screen_data.enemies.iter().position(|e| e.id == target_id) {
+                ui.group(|ui| {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 180, 0),
+                        "📝 ИНСПЕКТОР СУЩНОСТИ",
+                    );
+                    ui.add_space(2.0);
 
-                ui.selectable_value(&mut current_default_ai, 4, t4_name);
+                    let enemy = &mut screen_data.enemies[enemy_idx];
+                    let mut current_ai = EnemyAiType::from_u8(enemy.tp);
 
-                ui.separator();
-                ui.label("Воладоры / Летающие:");
-                ui.selectable_value(&mut current_default_ai, 5, "Тип 5 (0x05): Random Respawn Призрак");
-                ui.selectable_value(&mut current_default_ai, 6, "Тип 6 (0x06): Настоящий Fanty Призрак");
+                    // 1. Изменение интеллекта (ИИ) прямо из инспектора левой панели
+                    ui.label("🧠 Поведение этого врага:");
+                    egui::ComboBox::from_id_source("inspector_enemy_ai_combo")
+                        .selected_text(current_ai.to_ru_name(is_top_down))
+                        .show_ui(ui, |ui| {
+                            for code in 1..=14 {
+                                let ai_variant = EnemyAiType::from_u8(code);
+                                ui.selectable_value(
+                                    &mut current_ai,
+                                    ai_variant,
+                                    ai_variant.to_ru_name(is_top_down),
+                                );
+                            }
+                        });
+                    enemy.tp = current_ai.to_u8();
 
-                ui.separator();
-                ui.label("Куадраторы (По внешнему борту):");
-                ui.selectable_value(&mut current_default_ai, 7, "Тип 7 (0x07): Куадратор");
-                ui.selectable_value(&mut current_default_ai, 8, "Тип 8 (0x08): Куадратор");
-                ui.selectable_value(&mut current_default_ai, 9, "Тип 9 (0x09): Куадратор");
-                let t10_name = if project.config.movement_controls.player_genital {
-                    "Тип 10 (0x0A): Куадратор ИИ"
-                } else {
-                    "Тип 10 (0x0A): Пл. Куадратор (Лифт)"
-                };
-                ui.selectable_value(&mut current_default_ai, 10, t10_name);
+                    ui.add_space(2.0);
+                    ui.small(current_ai.to_ru_description(is_top_down));
+                    ui.separator();
 
-                ui.separator();
-                ui.label("Патруллеры марруллеры (Хаотичный ход):");
-                ui.selectable_value(&mut current_default_ai, 11, "Тип 11 (0x0B): Маррулер");
-                ui.selectable_value(&mut current_default_ai, 12, "Тип 12 (0x0C): Маррулер");
-                ui.selectable_value(&mut current_default_ai, 13, "Тип 13 (0x0D): Маррулер");
-                ui.selectable_value(&mut current_default_ai, 14, "Тип 14 (0x0E): Маррулер");
+                    // 2. Смена графического слота для выделенного врага
+                    ui.label("🎨 Слот графики в sprites.png:");
+                    ui.horizontal(|ui| {
+                        for slot in 0..=3 {
+                            ui.selectable_value(
+                                &mut enemy.sprite_slot,
+                                slot,
+                                format!("Слот {}", slot + 1),
+                            );
+                        }
+                    });
+
+                    ui.add_space(4.0);
+                    ui.label(format!("📍 Позиция: X: {}, Y: {}", enemy.x, enemy.y));
+                    ui.label(format!("🏁 Траектория: X2: {}, Y2: {}", enemy.x2, enemy.y2));
+                    ui.add_space(4.0);
+
+                    // 3. Безопасное удаление врага с карты одной кнопкой
+                    if ui.button("❌ Удалить врага с карты").clicked() {
+                        screen_data.enemies.remove(enemy_idx);
+                        // Снимаем выделение
+                        ui.ctx()
+                            .data_mut(|d| d.remove_temp::<u64>(id_context_enemy));
+                    }
+                });
+            }
+        }
+    } else {
+        // Подсказка для геймдизайнера, если ничего не выбрано
+        ui.group(|ui| {
+            ui.vertical_centered(|ui| {
+                ui.small("💡 Совет:\nЩёлкните Правой Кнопкой Мыши (ПКЛ) по любому врагу на холсте карты, чтобы открыть его свойства в этом окне.");
             });
-
-        // Сохраняем измененный выбор обратно в контекст
-        ui.ctx().data_mut(|d| d.insert_temp(id_ai, current_default_ai));
-
-        ui.add_space(2.0);
-        let ai_desc = match current_default_ai {
-            1..=4 => "↔️/↕️ Линейные:\nХодят туда-обратно. Если X1!=X2 и Y1!=Y2, рикошетят по диагонали.",
-            5 => "👻 Random Respawn:\nАвто-матушка при входе. Спавнится за пределами экрана, если убить линейного врага.",
-            6 => "👻 Настоящий Fanty:\nСпавнится в точке установки и преследует. При потере агро летит назад в X1/Y1.",
-            7..=10 => "🔄 Куадратор:\nХодит строго по внешнему периметру рамки. Вращение зависит от вектора диагонали.",
-            11..=14 => "🌀 Маррулер хаотичный:\nХодит наобум до упора в препятствие, после чего меняет вектор хода.",
-            _ => ""
-        };
-        ui.small(ai_desc);
-    });
+        });
+    }
 }

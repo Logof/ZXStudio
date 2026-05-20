@@ -1,4 +1,5 @@
 pub mod config;
+pub mod enemy_ai;
 pub mod project;
 pub mod screen;
 
