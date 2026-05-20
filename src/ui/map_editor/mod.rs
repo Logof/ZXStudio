@@ -74,6 +74,7 @@ pub fn render_map_editor(
                             map_edit_mode,
                             selected_enemy_sprite_slot,
                             tileset_texture,
+                            sprites_texture,
                         );
                     },
                 );
