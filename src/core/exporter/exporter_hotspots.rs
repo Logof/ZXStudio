@@ -12,17 +12,17 @@ pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> Strin
         let scr_key = format!("screen_{}", i);
 
         if let Some(screen) = project.screens.get(&scr_key) {
-            if screen.hotspot.tp > 0 {
+            if screen.hotspot.type_id > 0 {
                 // Формула сжатия Mojon Twins: xy = (y * 16) + x
                 let compressed_xy = (screen.hotspot.y * 16) + screen.hotspot.x;
 
                 body.push_str(&format!(
                     "\t{{{}, {}, 0}}, // Screen {}\n",
-                    compressed_xy, screen.hotspot.tp, i
+                    compressed_xy, screen.hotspot.type_id, i
                 ));
 
-                if (screen.hotspot.tp as usize) < n_hotspots_type.len() {
-                    n_hotspots_type[screen.hotspot.tp as usize] += 1;
+                if (screen.hotspot.type_id as usize) < n_hotspots_type.len() {
+                    n_hotspots_type[screen.hotspot.type_id as usize] += 1;
                 }
             } else {
                 // Если хотспота нет — пишем пустую Си-заглушку, увеличивая счетчик типа 0

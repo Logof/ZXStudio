@@ -44,6 +44,11 @@ impl ZxIdeApp {
             selected_hotspot_type: 1,
 
             tileset_texture: None,
+            // ============================================================================
+            // ИСПРАВЛЕНО: Добавлена инициализация вектора индивидуальных текстур тайлов
+            // ============================================================================
+            sliced_tile_textures: Vec::new(),
+
             sprites_texture: None,
             hud_frame_texture: None,
 
@@ -116,7 +121,7 @@ impl eframe::App for ZxIdeApp {
                 ui.horizontal(|ui| {
                     ui.label(&self.status_message);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // ИСПРАВЛЕНО: Изменен путь адресации max_bullets под новую структуру данных
+                        // Изменен путь адресации max_bullets под новую структуру данных
                         let numblocks =
                             (16 * 10) + (self.project.config.shooting_boxes.max_bullets * 5);
                         ui.label(format!("NUMBLOCKS: {}", numblocks));
@@ -150,7 +155,7 @@ impl eframe::App for ZxIdeApp {
                     status_message: &self.status_message,
                     map_edit_mode: &mut self.map_edit_mode,
                     selected_enemy_type: &mut self.selected_enemy_type,
-                    tileset_texture: &self.tileset_texture,
+                    sliced_tile_textures: &self.sliced_tile_textures,
                     sprites_texture: &self.sprites_texture,
                     hud_frame_texture: &self.hud_frame_texture,
                 };
@@ -168,12 +173,11 @@ impl eframe::App for ZxIdeApp {
                     }
                 }
 
-                // 🆕 НОВЫЙ БЛОК: Перехватываем сигнал из конфигуратора и создаем файл!
+                // Перехватываем сигнал из конфигуратора и создаем файл!
                 if let Some(true) = ui
                     .ctx()
                     .data_mut(|d| d.remove_temp::<bool>(egui::Id::new("trigger_create_lock_clear")))
                 {
-                    // Теперь у нас есть прямой доступ к self.project_path и self.status_message!
                     match create_custom_lock_clear_file(&self.project_path) {
                         Ok(()) => {
                             self.status_message =

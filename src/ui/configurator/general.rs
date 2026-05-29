@@ -19,6 +19,48 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
         "USE_MAP_CUSTOM_DECODER (Кастомный декодер карты)",
     );
 
+    // ============================================================================
+    // НОВОЕ УЛУЧШЕНИЕ: Информационная сводка лимитов памяти под текущий TileMode
+    // ============================================================================
+    ui.add_space(4.0);
+    egui::Frame::none()
+        .fill(ui.visuals().faint_bg_color)
+        .rounding(4.0)
+        .inner_margin(8.0)
+        .show(ui, |ui| {
+            let mode = project.tile_mode;
+            ui.horizontal(|ui| {
+                ui.small("📊 Архитектура:");
+                ui.colored_label(
+                    ui.visuals().strong_text_color(),
+                    format!(" {}", mode.name()),
+                );
+            });
+
+            let map_w = project.config.map_goals.map_w as usize;
+            let map_h = project.config.map_goals.map_h as usize;
+            let total_screens = map_w * map_h;
+            let screen_size_bytes = 15 * 10; // Размер одного экрана в тайлах
+
+            // Считаем расход памяти на карту в байтах на основе выбранного режима сжатия
+            let total_map_bytes = match mode {
+                crate::models::project::TileMode::Packed16
+                | crate::models::project::TileMode::Packed16WithShadows => {
+                    // 4 бита на тайл = 2 тайла в байт
+                    (total_screens * screen_size_bytes + 1) / 2
+                }
+                crate::models::project::TileMode::Extended48 => {
+                    // 8 бит на тайл = 1 байт на тайл
+                    total_screens * screen_size_bytes
+                }
+            };
+
+            ui.small(format!(
+                "Размер игрового мира: {} экранов. Вес карты в RAM: {} байт.",
+                total_screens, total_map_bytes
+            ));
+        });
+
     ui.separator();
     ui.strong("🎵 Аудиосистема (Музыка и Звуковые Эффекты)");
     ui.add_space(4.0);

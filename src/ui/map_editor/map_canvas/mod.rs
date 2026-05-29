@@ -19,7 +19,7 @@ pub fn render_map_canvas(
     clash_errors: &[ClashError],
     map_edit_mode: &MapEditMode,
     selected_enemy_sprite_slot: u8,
-    tileset_texture: &Option<egui::TextureHandle>,
+    sliced_tile_textures: &[egui::TextureHandle],
     sprites_texture: &Option<egui::TextureHandle>,
 ) {
     let map_w = project.config.map_goals.map_w as usize;
@@ -75,7 +75,7 @@ pub fn render_map_canvas(
             .data(|d| d.get_temp::<usize>(active_drag_enemy_id).is_some());
 
         // ============================================================================
-        // ОБРАБОТКА ВВОДА: ВЫДЕЛЕНИЕ (ПКЛ) И СПАВН (ЛКМ)
+        // ОБРАБОТКА ВВОДА: ВЫДЕЛЕНИЕ (ПКЛ) И СПАВН (ЛКМ) С АВТОСИНХРОНИЗАЦИЕЙ ХОТСПОРТОВ
         // ============================================================================
         if let Some((scr_idx, cell_x, cell_y)) = virtual_cell_pos {
             let scr_key = format!("screen_{}", scr_idx);
@@ -121,8 +121,15 @@ pub fn render_map_canvas(
                         if (is_primary_drag || is_primary_click)
                             && !ui.ctx().input(|i| i.modifiers.ctrl)
                         {
-                            let index = (cell_y as usize) * 15 + (cell_x as usize);
-                            screen_data.tiles_matrix[index] = *selected_tile;
+                            // ============================================================================
+                            // ИСПРАВЛЕНО: Вместо прямой перезаписи матрицы вызываем метод ядра с авто-апдейтом хотспотов
+                            // ============================================================================
+                            screen_data.set_tile_and_sync(
+                                cell_x,
+                                cell_y,
+                                *selected_tile,
+                                project.tile_mode,
+                            );
                         }
                     }
                     MapEditMode::Enemies => {
@@ -163,8 +170,9 @@ pub fn render_map_canvas(
                                     y1: cell_y,
                                     x2: cell_x,
                                     y2: cell_y,
-                                    tp: forced_ai_by_slot,
+                                    type_id: forced_ai_by_slot,
                                     sprite_slot: selected_enemy_sprite_slot,
+                                    speed: 2,
                                 };
 
                                 match forced_ai_by_slot {
@@ -230,12 +238,13 @@ pub fn render_map_canvas(
                     .cloned()
                     .unwrap_or_else(ScreenData::default);
 
+                // ИСПРАВЛЕНО: Передаем нарезанный массив текстур вместо старой монолитной текстуры
                 tile_layer::render_tiles(
                     &painter,
                     view_rect,
                     &screen_data,
                     camera.zoom,
-                    tileset_texture,
+                    sliced_tile_textures,
                 );
                 tile_layer::render_grid(&painter, view_rect, camera.zoom);
 
@@ -262,7 +271,7 @@ pub fn render_map_canvas(
                 };
                 painter.rect_stroke(view_rect, 0.0, border_stroke);
 
-                // Если внутри рендеринга врагов кликнули ПКЛ по ручке —Inspector подхватит
+                // Если внутри рендеринга врагов кликнули ПКЛ по ручке — Inspector подхватит
                 entity_layer::render_entities(
                     ui,
                     &painter,

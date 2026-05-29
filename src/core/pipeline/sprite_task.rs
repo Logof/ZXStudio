@@ -67,7 +67,7 @@ pub fn export_enemy_data(
                 let final_y1 = ((enemy.y1.min(enemy.y2) as u16).clamp(0, 9) * 16) + 16;
                 let final_y2 = ((enemy.y1.max(enemy.y2) as u16).clamp(0, 9) * 16) + 16;
 
-                let mut ai_type = enemy.tp;
+                let mut ai_type = enemy.type_id;
                 if ai_type == 0 {
                     ai_type = 1;
                 }
@@ -169,9 +169,9 @@ pub fn export_enemy_data(
 
         if let Some(screen_data) = project.screens.get(&scr_key) {
             let hotspot = &screen_data.hotspot;
-            if hotspot.tp > 0 {
+            if hotspot.type_id > 0 {
                 xy_byte = (hotspot.y << 4) | (hotspot.x & 0x0F);
-                h_type = hotspot.tp;
+                h_type = hotspot.type_id;
                 let type_idx = (h_type as usize).min(7);
                 n_hotspot_types[type_idx] += 1;
             }

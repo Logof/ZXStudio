@@ -93,7 +93,7 @@ pub fn render(
                     ui.add_space(2.0);
 
                     let enemy = &mut screen_data.enemies[enemy_idx];
-                    let mut current_ai = EnemyAiType::from_u8(enemy.tp);
+                    let mut current_ai = EnemyAiType::from_u8(enemy.type_id);
 
                     // 1. Изменение интеллекта (ИИ) прямо из инспектора левой панели
                     ui.label("🧠 Поведение этого врага:");
@@ -109,7 +109,7 @@ pub fn render(
                                 );
                             }
                         });
-                    enemy.tp = current_ai.to_u8();
+                    enemy.type_id = current_ai.to_u8();
 
                     ui.add_space(2.0);
                     ui.small(current_ai.to_ru_description(is_top_down));
@@ -130,6 +130,23 @@ pub fn render(
                     ui.add_space(4.0);
                     ui.label(format!("📍 Позиция: X: {}, Y: {}", enemy.x, enemy.y));
                     ui.label(format!("🏁 Траектория: X2: {}, Y2: {}", enemy.x2, enemy.y2));
+                    ui.add_space(4.0);
+
+                    ui.label("⚡ Скорость движения (пикселей/кадр):");
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut enemy.speed, 1, "1 (Медленно)")
+                            .on_hover_text(
+                                "Безопасно. Подходит для тяжелых платформ или мелких жуков.",
+                            );
+                        ui.radio_value(&mut enemy.speed, 2, "2 (Нормально)")
+                            .on_hover_text(
+                                "Стандарт движка. Оптимальный баланс для большинства врагов.",
+                            );
+                        ui.radio_value(&mut enemy.speed, 4, "4 (Быстро!)")
+                            .on_hover_text(
+                                "Максимальная скорость. Враг движется очень агрессивно.",
+                            );
+                    });
                     ui.add_space(4.0);
 
                     // 3. Безопасное удаление врага с карты одной кнопкой

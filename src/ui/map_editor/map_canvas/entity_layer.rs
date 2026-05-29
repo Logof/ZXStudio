@@ -40,7 +40,7 @@ pub fn render_entities(
     let tile_side = 32.0 * zoom;
 
     for (idx, enemy) in screen_data.enemies.iter().enumerate() {
-        let is_absolute_empty = enemy.tp == 0
+        let is_absolute_empty = enemy.type_id == 0
             && enemy.x1 == 0
             && enemy.x2 == 0
             && enemy.y1 == 0
@@ -61,8 +61,8 @@ pub fn render_entities(
         );
 
         let is_ghost_fanti = enemy.x1 == 0 && enemy.x2 == 0 && enemy.y1 == 0 && enemy.y2 == 0;
-        let is_quadrator = enemy.tp == 9 || enemy.tp == 10;
-        let is_marruler = enemy.tp >= 11 && enemy.tp <= 14;
+        let is_quadrator = enemy.type_id == 9 || enemy.type_id == 10;
+        let is_marruler = enemy.type_id >= 11 && enemy.type_id <= 14;
         let is_linear = !is_ghost_fanti && !is_quadrator && !is_marruler;
 
         if zoom > 0.15 {
@@ -77,7 +77,7 @@ pub fn render_entities(
 
             if let Some(tex) = sprites_texture {
                 let display_slot = if enemy.sprite_slot == 0 {
-                    match enemy.tp {
+                    match enemy.type_id {
                         5 | 6 => 1,
                         7..=10 => 2,
                         _ => 0,
@@ -215,14 +215,14 @@ pub fn render_entities(
 }
 
 fn sanitize_enemy_boundaries_interactive(enemy: &mut Enemy) {
-    if enemy.tp == 0 {
+    if enemy.type_id == 0 {
         return;
     }
     // Синхронизируем базовые Си-привязки
     enemy.x1 = enemy.x;
     enemy.y1 = enemy.y;
 
-    let is_ghost = enemy.tp == 5 || enemy.tp == 6;
+    let is_ghost = enemy.type_id == 5 || enemy.type_id == 6;
     if is_ghost {
         enemy.x1 = 0;
         enemy.x2 = 0;

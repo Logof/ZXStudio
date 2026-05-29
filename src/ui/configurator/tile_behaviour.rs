@@ -17,16 +17,28 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
     }
 
     ui.add_enabled_ui(!is_compressed, |ui| {
-        let tileset_tex: Option<egui::TextureHandle> =
-            ui.ctx().data(|d| d.get_temp(egui::Id::new("tileset_tex")));
+        // Извлекаем срез индивидуально нарезанных текстур 16x16 из контекста приложения
+        let sliced_textures: Option<Vec<egui::TextureHandle>> = ui
+            .ctx()
+            .data(|d| d.get_temp(egui::Id::new("sliced_tile_textures_ctx")));
+
+        // Динамически определяем лимит ячеек в зависимости от выбранного режима тайлов (16 или 48)
+        let mode = project.tile_mode;
+        let behaviours_count = mode.behaviours_count();
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             // Увеличиваем spacing, так как элементы стали шире из-за ID слева
             egui::Grid::new("behs_matrix_grid")
                 .spacing([14.0, 10.0])
                 .show(ui, |ui| {
-                    for tile_id in 0..48 {
-                        let current_val = &mut project.config.tile_behaviour.behs[tile_id];
+                    for tile_id in 0..behaviours_count {
+                        // БЕЗОПАСНОСТЬ ПАМЯТИ: Защита от выхода за границы массива поведений проекта
+                        if tile_id >= project.tile_behaviours.len() {
+                            break;
+                        }
+
+                        // Связываем логику с синхронизированным вектором поведений ядра модели
+                        let current_val = &mut project.tile_behaviours[tile_id];
 
                         // Группируем один элемент в вертикальный контейнер для центрирования кнопки кода снизу
                         ui.vertical(|ui| {
@@ -35,26 +47,36 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
                                 // 1. Выводим ID тайла слева в формате "00 × " с моноширинным выравниванием
                                 ui.monospace(format!("{:02} ×", tile_id));
 
-                                // 2. Отрисовка графического мини-тайла
-                                if let Some(ref tex) = tileset_tex {
-                                    let tex_size = tex.size_vec2();
-                                    let tw = 16.0 / tex_size.x;
-                                    let th = 16.0 / tex_size.y;
-                                    let tx = (tile_id % 16) as f32 * tw;
-                                    let ty = (tile_id / 16) as f32 * th;
+                                // 2. Отрисовка графического мини-тайла на основе нарезанных текстур
+                                if let Some(ref tex_list) = sliced_textures {
+                                    if let Some(tex) = tex_list.get(tile_id) {
+                                        // Используем полные UV-координаты [0..1], так как тайл уже изолирован слайсером
+                                        let uv_rect = egui::Rect::from_min_max(
+                                            egui::pos2(0.0, 0.0),
+                                            egui::pos2(1.0, 1.0),
+                                        );
 
-                                    let uv_rect = egui::Rect::from_min_max(
-                                        egui::pos2(tx, ty),
-                                        egui::pos2(tx + tw, ty + th),
-                                    );
-
-                                    ui.add(
-                                        egui::Image::new(egui::load::SizedTexture::new(
-                                            tex.id(),
+                                        ui.add(
+                                            egui::Image::new(egui::load::SizedTexture::new(
+                                                tex.id(),
+                                                egui::vec2(32.0, 32.0),
+                                            ))
+                                            .uv(uv_rect),
+                                        );
+                                    } else {
+                                        // Отрисовка цветного плейсхолдера, если индекс за рамками файла графики (например, служебный ряд)
+                                        let (rect, _) = ui.allocate_exact_size(
                                             egui::vec2(32.0, 32.0),
-                                        ))
-                                        .uv(uv_rect),
-                                    );
+                                            egui::Sense::hover(),
+                                        );
+                                        let fill_color = match tile_id {
+                                            14 => egui::Color32::from_rgb(40, 70, 150),
+                                            15 => egui::Color32::from_rgb(150, 40, 40),
+                                            16..=18 => egui::Color32::from_rgb(40, 120, 40),
+                                            _ => egui::Color32::from_gray(40),
+                                        };
+                                        ui.painter().rect_filled(rect, 2.0, fill_color);
+                                    }
                                 } else {
                                     let (rect, _) = ui.allocate_exact_size(
                                         egui::vec2(32.0, 32.0),
@@ -77,10 +99,11 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
                                     ui.strong(format!("Физика тайла #{}", tile_id));
 
                                     let mut is_kills = (*current_val & 1) != 0;
-                                    let mut is_hides = (*current_val & 2) != 0;
-                                    let mut is_platform = (*current_val & 4) != 0;
-                                    let mut is_obstacle = (*current_val & 8) != 0;
-                                    let mut is_breakable = (*current_val & 16) != 0;
+                                    let mut mut_val = *current_val;
+                                    let mut is_hides = (mut_val & 2) != 0;
+                                    let mut is_platform = (mut_val & 4) != 0;
+                                    let mut is_obstacle = (mut_val & 8) != 0;
+                                    let mut is_breakable = (mut_val & 16) != 0;
 
                                     if ui
                                         .checkbox(&mut is_obstacle, "Сплошная Стена (8)")

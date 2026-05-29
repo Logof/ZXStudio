@@ -1,3 +1,4 @@
+use crate::models::project::TileMode;
 use eframe::egui;
 use image::{Rgb, RgbImage};
 use std::path::Path;
@@ -16,7 +17,6 @@ pub fn process_tileset_for_mappy(
     let img = image::open(source_path)?;
     let mut rgb_img: RgbImage = img.to_rgb8();
 
-    // Зануляем область тайла 0 (координаты X: 0..16, Y: 0..16) в черный цвет
     for y in 0..16 {
         for x in 0..16 {
             rgb_img.put_pixel(x, y, Rgb([0, 0, 0]));
@@ -51,28 +51,23 @@ pub fn generate_sprite_masks(sprites_path: &str) -> Result<(), image::ImageError
 
     let mut output_img = rgb_img.clone();
 
-    // Обрабатываем обе строки (Y=0: Игрок, Y=16: Враги/Платформы)
     for row_y in [0, 16] {
-        // Шаг цикла = 32 пикселя (16 пикселей спрайт + 16 пикселей маска)
         for block_x in (0..256).step_by(32) {
             let sprite_start_x = block_x;
             let mask_start_x = block_x + 16;
 
-            // Попиксельно сканируем окно спрайта 16x16
             for y in 0..16 {
                 for x in 0..16 {
                     let px_x = sprite_start_x + x;
                     let pixel_color = rgb_img.get_pixel(px_x, row_y + y);
 
-                    // Спецификация Mojon Twins: RGB(0,0,0) — пустой фон, остальное — тело объекта
                     let mask_pixel =
                         if pixel_color[0] == 0 && pixel_color[1] == 0 && pixel_color[2] == 0 {
-                            Rgb([255, 255, 255]) // Белый цвет маски указывает Спектруму на прозрачность
+                            Rgb([255, 255, 255])
                         } else {
-                            Rgb([0, 0, 0]) // Черный цвет маски вырезает силуэт под наложение
+                            Rgb([0, 0, 0])
                         };
 
-                    // Записываем сгенерированный пиксель маски в соседнее правое окно 16x16
                     output_img.put_pixel(mask_start_x + x, row_y + y, mask_pixel);
                 }
             }
@@ -83,40 +78,113 @@ pub fn generate_sprite_masks(sprites_path: &str) -> Result<(), image::ImageError
     Ok(())
 }
 
-// ============================================================================
-// ДОБАВЛЕНО: Утилита фоновой конвертации для egui видеотекстур
-// ============================================================================
 pub fn load_png_to_image<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, String> {
     let img = image::open(path).map_err(|e| format!("Ошибка чтения PNG: {}", e))?;
     let size = [img.width() as usize, img.height() as usize];
     let rgba_pixels = img.to_rgba8().into_raw();
-
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &rgba_pixels))
 }
 
 pub fn load_work_png_to_image_ram<P: AsRef<Path>>(path: P) -> Result<egui::ColorImage, String> {
-    // 1. Открываем оригинальный work.png
     let img = image::open(path).map_err(|e| format!("Ошибка чтения PNG: {}", e))?;
     let mut rgb_img = img.to_rgb8();
 
-    // 2. Монолитно зануляем область Тайла 0 в оперативной памяти
     for y in 0..16 {
         for x in 0..16 {
             rgb_img.put_pixel(x, y, Rgb([0, 0, 0]));
         }
     }
 
-    // 3. Конвертируем модифицированный буфер в формат RGBA, который ожидает egui
     let size = [rgb_img.width() as usize, rgb_img.height() as usize];
-
-    // Создаем вектор пикселей с альфа-каналом (ставим opaque непрозрачность 255)
     let mut rgba_pixels = Vec::with_capacity(size[0] * size[1] * 4);
     for pixel in rgb_img.pixels() {
         rgba_pixels.push(pixel[0]);
         rgba_pixels.push(pixel[1]);
         rgba_pixels.push(pixel[2]);
-        rgba_pixels.push(255); // Непрозрачный альфа-канал
+        rgba_pixels.push(255);
     }
 
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &rgba_pixels))
+}
+
+// ============================================================================
+// УЛУЧШЕННЫЙ ОТКАЗОУСТОЙЧИВЫЙ СЛАЙСЕР С АВТОДОЗАПОЛНЕНИЕМ ТЕНИ
+// ============================================================================
+pub struct TileSlicer;
+
+impl TileSlicer {
+    /// Нарезает `egui::ColorImage` на массив тайлов 16x16.
+    /// Если файл на диске меньше ожидаемого разрешения, метод автоматически догенерирует
+    /// недостающие графические ячейки в памяти, исключая падение UI и пропажу карты.
+    pub fn slice_tiles(
+        source: &egui::ColorImage,
+        mode: TileMode,
+    ) -> Result<Vec<egui::ColorImage>, String> {
+        let (expected_w, _expected_h) = mode.expected_dimensions();
+        let current_w = source.size[0];
+        let current_h = source.size[1];
+
+        // Ширину (256 px) проверяем жестко, так как это базис сетки 16 тайлов в ряд
+        if current_w != expected_w as usize {
+            return Err(format!(
+                "Конфликт ширины тайлсета! Ожидалось {} px, получено {} px.",
+                expected_w, current_w
+            ));
+        }
+
+        let tile_size = 16;
+        let cols = current_w / tile_size;
+        let rows = current_h / tile_size;
+        let mut tiles = Vec::new();
+
+        // Лимиты полезных тайлов для каждого режима
+        let target_max_count = match mode {
+            TileMode::Packed16 => 20,
+            TileMode::Packed16WithShadows => 32, // 16 основных + 16 теневых/служебных
+            TileMode::Extended48 => 48,
+        };
+
+        // Шаг 1: Нарезаем то, что физически присутствует в изображении
+        for r in 0..rows {
+            for c in 0..cols {
+                if tiles.len() >= target_max_count {
+                    break;
+                }
+
+                let mut tile_pixels = Vec::with_capacity(tile_size * tile_size);
+                for y in 0..tile_size {
+                    let pixel_y = r * tile_size + y;
+                    for x in 0..tile_size {
+                        let pixel_x = c * tile_size + x;
+                        let index = pixel_y * current_w + pixel_x;
+                        tile_pixels.push(source.pixels[index]);
+                    }
+                }
+
+                tiles.push(egui::ColorImage {
+                    size: [tile_size, tile_size],
+                    pixels: tile_pixels,
+                });
+            }
+        }
+
+        // ============================================================================
+        // ИСПРАВЛЕНО: Автодозаполнение памяти, если высота файла меньше требуемой.
+        // Если перешли с 48/16 на Автошейдинг, но работаем со старым файлом (высота 48 вместо 96),
+        // дозабиваем недостающие ячейки (до 32) темными плейсхолдерами, сохраняя основную графику на карте!
+        // ============================================================================
+        while tiles.len() < target_max_count {
+            let index = tiles.len();
+            let fill_color = match index {
+                14 => egui::Color32::from_rgb(40, 70, 150), // Синий пуш-блок
+                15 => egui::Color32::from_rgb(150, 40, 40), // Красный замок
+                16..=18 => egui::Color32::from_rgb(40, 120, 40), // Зеленые хотспоты
+                20..=31 => egui::Color32::from_rgba_unmultiplied(20, 20, 25, 180), // Темные копии для теней
+                _ => egui::Color32::from_gray(45),
+            };
+            tiles.push(egui::ColorImage::new([tile_size, tile_size], fill_color));
+        }
+
+        Ok(tiles)
+    }
 }

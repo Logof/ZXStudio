@@ -16,7 +16,10 @@ pub fn render_map_editor(
     clash_errors: &[ClashError],
     map_edit_mode: &mut MapEditMode,
     selected_enemy_sprite_slot: &mut u8,
-    tileset_texture: &Option<egui::TextureHandle>,
+    // ============================================================================
+    // ИСПРАВЛЕНО: Редактор принимает срез индивидуально нарезанных текстур тайлов
+    // ============================================================================
+    sliced_tile_textures: &[egui::TextureHandle],
     sprites_texture: &Option<egui::TextureHandle>,
 ) {
     // ЖЕСТКОЕ РЕШЕНИЕ: Отключаем встроенный скролл текущего ui-контейнера,
@@ -40,6 +43,7 @@ pub fn render_map_editor(
                     egui::vec2(left_panel_width, ui.available_height()),
                     egui::Layout::top_down(egui::Align::LEFT),
                     |ui| {
+                        // ИСПРАВЛЕНО: Пробрасываем нарезанный срез текстур в левую панель
                         left_panel::render(
                             ui,
                             project,
@@ -47,7 +51,7 @@ pub fn render_map_editor(
                             map_edit_mode,
                             selected_tile,
                             selected_enemy_sprite_slot,
-                            tileset_texture,
+                            sliced_tile_textures,
                             sprites_texture,
                         );
                     },
@@ -65,6 +69,7 @@ pub fn render_map_editor(
                     egui::vec2(right_width, right_height),
                     egui::Layout::top_down(egui::Align::LEFT),
                     |ui| {
+                        // ИСПРАВЛЕНО: Пробрасываем нарезанный срез текстур в правую панель
                         right_panel::render(
                             ui,
                             project,
@@ -73,7 +78,7 @@ pub fn render_map_editor(
                             clash_errors,
                             map_edit_mode,
                             selected_enemy_sprite_slot,
-                            tileset_texture,
+                            sliced_tile_textures,
                             sprites_texture,
                         );
                     },

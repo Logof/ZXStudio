@@ -22,6 +22,11 @@ pub struct ZxIdeApp {
     pub selected_hotspot_type: u8,
 
     pub tileset_texture: Option<eframe::egui::TextureHandle>,
+    // ============================================================================
+    // НОВОЕ УЛУЧШЕНИЕ: Вектор индивидуальных 16x16 текстур тайлов для UI палитры
+    // ============================================================================
+    pub sliced_tile_textures: Vec<eframe::egui::TextureHandle>,
+
     pub sprites_texture: Option<eframe::egui::TextureHandle>,
     pub hud_frame_texture: Option<eframe::egui::TextureHandle>,
 

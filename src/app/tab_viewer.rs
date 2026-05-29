@@ -1,7 +1,7 @@
 // src/app/tab_viewer.rs
 use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
-use crate::models::{ProjectData, ScreenData};
+use crate::models::ProjectData;
 use eframe::egui;
 use egui_dock::TabViewer;
 
@@ -17,7 +17,7 @@ pub struct ZxTabViewer<'a> {
     pub project_name: &'a str,
     pub project_path: &'a str,
 
-    pub configurator_tab: &'a mut ConfigTab, // Ссылка на вкладку настроек движка
+    pub configurator_tab: &'a mut ConfigTab,
 
     pub selected_screen: &'a mut usize,
     pub selected_tile: &'a mut u8,
@@ -26,7 +26,7 @@ pub struct ZxTabViewer<'a> {
     pub status_message: &'a str,
     pub map_edit_mode: &'a mut MapEditMode,
     pub selected_enemy_type: &'a mut u8,
-    pub tileset_texture: &'a Option<egui::TextureHandle>,
+    pub sliced_tile_textures: &'a [egui::TextureHandle],
     pub sprites_texture: &'a Option<egui::TextureHandle>,
     pub hud_frame_texture: &'a Option<egui::TextureHandle>,
 }
@@ -46,9 +46,10 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        if let Some(tex) = self.tileset_texture {
+        // Проверяем первый нарезанный тайл (если он есть), чтобы прокинуть в контекст
+        if let Some(first_tile_tex) = self.sliced_tile_textures.first() {
             ui.ctx()
-                .data_mut(|d| d.insert_temp(egui::Id::new("tileset_tex"), tex.clone()));
+                .data_mut(|d| d.insert_temp(egui::Id::new("tileset_tex"), first_tile_tex.clone()));
         }
 
         match tab {
@@ -76,6 +77,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 let mut child_ui =
                     ui.child_ui(child_rect, egui::Layout::top_down(egui::Align::LEFT));
 
+                // ИСПРАВЛЕНО: Пробрасываем срез нарезанных текстур тайлов в редактор карт
                 crate::ui::map_editor::render_map_editor(
                     &mut child_ui,
                     self.project,
@@ -84,7 +86,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     self.clash_errors,
                     self.map_edit_mode,
                     self.selected_enemy_type,
-                    self.tileset_texture,
+                    self.sliced_tile_textures,
                     self.sprites_texture,
                 );
 

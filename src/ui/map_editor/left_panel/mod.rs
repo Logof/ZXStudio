@@ -12,7 +12,10 @@ pub fn render(
     map_edit_mode: &mut MapEditMode,
     selected_tile: &mut u8,
     selected_enemy_sprite_slot: &mut u8,
-    tileset_texture: &Option<egui::TextureHandle>,
+    // ============================================================================
+    // ИСПРАВЛЕНО: Левая панель теперь принимает срез нарезанных текстур тайлов
+    // ============================================================================
+    sliced_tile_textures: &[egui::TextureHandle],
     sprites_texture: &Option<egui::TextureHandle>,
 ) {
     let total_height = ui.available_height();
@@ -37,7 +40,8 @@ pub fn render(
 
                     match map_edit_mode {
                         MapEditMode::Tiles => {
-                            tiles_palette::render(ui, project, selected_tile, tileset_texture);
+                            // ИСПРАВЛЕНО: Передаем срез нарезанных текстур в палитру
+                            tiles_palette::render(ui, project, selected_tile, sliced_tile_textures);
                         }
                         MapEditMode::Enemies => {
                             enemies_palette::render(
