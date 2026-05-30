@@ -88,10 +88,6 @@ fn default_tile_mode() -> TileMode {
 pub struct ProjectData {
     pub config: PhysicsConfig,
     pub screens: HashMap<String, ScreenData>,
-
-    // ============================================================================
-    // ИСПРАВЛЕНО: Автоматически подставляет Packed16, если поле отсутствует в JSON
-    // ============================================================================
     #[serde(default = "default_tile_mode")]
     pub tile_mode: TileMode,
 
@@ -104,6 +100,8 @@ pub struct ProjectData {
     pub role_alt_bg_active: bool,      // Роль для тайла 19
 
     pub tile_behaviours: Vec<u8>,
+    #[serde(default = "default_project_font")]
+    pub font_data: Vec<u8>,
 }
 
 impl Default for ProjectData {
@@ -112,6 +110,8 @@ impl Default for ProjectData {
         screens.insert("screen_0".to_string(), ScreenData::default());
 
         let default_mode = TileMode::Packed16;
+
+        let mut default_font = vec![0u8; 768];
 
         Self {
             config: PhysicsConfig::default(),
@@ -126,6 +126,35 @@ impl Default for ProjectData {
             role_alt_bg_active: false,
 
             tile_behaviours: default_mode.default_behaviours(),
+            font_data: default_project_font(), // Переменная гарантированно видна компилятору!
         }
     }
+}
+
+fn default_project_font() -> Vec<u8> {
+    let mut default_font = vec![0u8; 768];
+
+    // Подгружаем контуры буквы 'A' для инициализации
+    let a_idx = 33 * 8;
+    default_font[a_idx + 0] = 0b00011000;
+    default_font[a_idx + 1] = 0b00100100;
+    default_font[a_idx + 2] = 0b01000010;
+    default_font[a_idx + 3] = 0b01111110;
+    default_font[a_idx + 4] = 0b01000010;
+    default_font[a_idx + 5] = 0b01000010;
+    default_font[a_idx + 6] = 0b01000010;
+    default_font[a_idx + 7] = 0b00000000;
+
+    // Подгружаем контуры буквы 'B'
+    let b_idx = 34 * 8;
+    default_font[b_idx + 0] = 0b01111100;
+    default_font[b_idx + 1] = 0b01000010;
+    default_font[b_idx + 2] = 0b01000010;
+    default_font[b_idx + 3] = 0b01111100;
+    default_font[b_idx + 4] = 0b01000010;
+    default_font[b_idx + 5] = 0b01000010;
+    default_font[b_idx + 6] = 0b01111100;
+    default_font[b_idx + 7] = 0b00000000;
+
+    default_font
 }

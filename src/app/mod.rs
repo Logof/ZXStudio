@@ -44,11 +44,8 @@ impl ZxIdeApp {
             cyber_palette_index: 0,
             selected_enemy_type: 0,
             selected_hotspot_type: 1,
-
+            selected_font_char_idx: 0,
             tileset_texture: None,
-            // ============================================================================
-            // ИСПРАВЛЕНО: Добавлена инициализация вектора индивидуальных текстур тайлов
-            // ============================================================================
             sliced_tile_textures: Vec::new(),
 
             sprites_texture: None,
@@ -225,6 +222,7 @@ impl eframe::App for ZxIdeApp {
                     sliced_tile_textures: &self.sliced_tile_textures,
                     sprites_texture: &self.sprites_texture,
                     hud_frame_texture: &self.hud_frame_texture,
+                    selected_font_char_idx: &mut self.selected_font_char_idx,
                 };
 
                 DockArea::new(&mut self.dock_state)

@@ -29,6 +29,12 @@ pub struct ZxTabViewer<'a> {
     pub sliced_tile_textures: &'a [egui::TextureHandle],
     pub sprites_texture: &'a Option<egui::TextureHandle>,
     pub hud_frame_texture: &'a Option<egui::TextureHandle>,
+
+    // ============================================================================
+    // НОВОЕ УЛУЧШЕНИЕ: Изменяемая ссылка на индекс выбранного ASCII-символа.
+    // Позволяет сквозным образом связать состояние приложения и редактор шрифтов.
+    // ============================================================================
+    pub selected_font_char_idx: &'a mut usize,
 }
 
 impl<'a> TabViewer for ZxTabViewer<'a> {
@@ -37,7 +43,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {
             CustomTab::ProjectTree => "📁 Проект".into(),
-            CustomTab::MapCanvas => "🗺️ Конструктор мира".into(),
+            CustomTab::MapCanvas => "🗺️ NM Конструктор мира".into(),
             CustomTab::ScriptEditor => "📜 Редактор скриптов".into(),
             CustomTab::Configurator => "⚙️ Настройки движка".into(),
             CustomTab::Console => "💻 Логи компиляции".into(),
@@ -101,22 +107,29 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             CustomTab::ScriptEditor => {
                 render_script_editor(ui, self.script_text, *self.selected_screen);
             }
+
             CustomTab::Configurator => {
-                // Передаем третьим параметром ссылку на активную вкладку
-                render_configurator(ui, self.project, self.configurator_tab);
+                // ============================================================================
+                // ИСПРАВЛЕНО: Передаем четвертый параметр selected_font_char_idx
+                // для управления пиксельной сеткой в новой подсистеме шрифтов
+                // ============================================================================
+                render_configurator(
+                    ui,
+                    self.project,
+                    self.configurator_tab,
+                    self.selected_font_char_idx,
+                );
             }
+
             CustomTab::HudEditor => {
                 // Вызов декомпозированного HUD-редактора из папки
                 render_hud_editor(ui, self.project, &self.hud_frame_texture);
             }
+
             CustomTab::Console => {
-                ui.heading("💻 Системный дамп и логи сборки проекта");
+                ui.heading("Логи сборки проекта");
                 ui.add_space(6.0);
 
-                // ============================================================================
-                // ИСПРАВЛЕНО: Вывод лога в виде многострочного защищенного текстового поля
-                // со скроллбаром и моноширинным шрифтом для удобного анализа дампов памяти.
-                // ============================================================================
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     ui.add(
                         egui::TextEdit::multiline(&mut self.status_message.to_string())

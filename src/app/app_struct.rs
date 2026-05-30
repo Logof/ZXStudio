@@ -38,4 +38,5 @@ pub struct ZxIdeApp {
     pub project_path: String,
 
     pub configurator_tab: ConfigTab,
+    pub selected_font_char_idx: usize,
 }
