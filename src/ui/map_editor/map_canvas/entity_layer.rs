@@ -38,20 +38,14 @@ pub fn render_entities(
     }
 
     let tile_side = 32.0 * zoom;
+    let id_context_enemy = egui::Id::new("inspector_selected_enemy_id");
 
     for (idx, enemy) in screen_data.enemies.iter().enumerate() {
-        let is_absolute_empty = enemy.type_id == 0
-            && enemy.x1 == 0
-            && enemy.x2 == 0
-            && enemy.y1 == 0
-            && enemy.y2 == 0
-            && enemy.x == 0
-            && enemy.y == 0;
-
-        if is_absolute_empty {
+        if enemy.type_id == 0 {
             continue;
         }
 
+        // Стартовый квадрат тела врага
         let e_rect = egui::Rect::from_min_size(
             egui::pos2(
                 scr_rect.min.x + enemy.x as f32 * tile_side,
@@ -110,6 +104,7 @@ pub fn render_entities(
             }
         }
 
+        // Финишный квадрат траектории
         let b2_rect = egui::Rect::from_min_size(
             egui::pos2(
                 scr_rect.min.x + enemy.x2 as f32 * tile_side,
@@ -117,8 +112,17 @@ pub fn render_entities(
             ),
             egui::vec2(tile_side, tile_side),
         );
+
         let handle_size = 12.0 * zoom;
-        let h2_rect =
+
+        // ============================================================================
+        // ИСПРАВЛЕНО: Умная ховер-зона (Магнит).
+        // Физический размер интерактивной зоны захвата h2_click_rect расширен до
+        // целого тайла 32x32, чтобы по нему было легко попасть мышкой на любом зуме!
+        // Визуальный маркер h2_view_rect при этом остается компактным и аккуратным.
+        // ============================================================================
+        let h2_click_rect = b2_rect;
+        let h2_view_rect =
             egui::Rect::from_center_size(b2_rect.center(), egui::vec2(handle_size, handle_size));
 
         let color_trajectory = if is_quadrator {
@@ -146,15 +150,21 @@ pub fn render_entities(
                 0.0,
                 egui::Stroke::new(1.5 * zoom, color_trajectory),
             );
-            painter.rect_filled(h2_rect, 1.0, color_trajectory);
+            painter.rect_filled(h2_view_rect, 1.0, color_trajectory);
         }
 
+        // ============================================================================
+        // ИСПРАВЛЕНО: Изменен приоритет перехвата клика мыши.
+        // Сначала проверяем наведение на финишную ручку (h2_click_rect с магнитом),
+        // и только если мышь не над ней — разрешаем тащить само тело врага (e_rect).
+        // Это полностью решает проблему заклинивания ручек при совпадении координат!
+        // ============================================================================
         if is_lkm_down
             && current_dragged_enemy_idx.is_none()
             && *map_edit_mode == MapEditMode::Enemies
         {
             if let Some(m_pos) = mouse_pos {
-                if h2_rect.contains(m_pos) && !is_ghost_fanti {
+                if h2_click_rect.contains(m_pos) && !is_ghost_fanti {
                     current_dragged_enemy_idx = Some(idx);
                     current_dragged_handle_type = Some(2);
                     ui.ctx().data_mut(|d| {
@@ -178,31 +188,30 @@ pub fn render_entities(
     {
         if let Some(pos) = mouse_pos {
             if let Some(enemy) = screen_data.enemies.get(drag_idx) {
-                let mut updated_enemy = enemy.clone();
-                let world_mouse_x = pos.x - scr_rect.min.x;
-                let world_mouse_y = pos.y - scr_rect.min.y;
-                let cell_x = ((world_mouse_x / tile_side).floor() as i32).clamp(0, 14) as u8;
-                let cell_y = ((world_mouse_y / tile_side).floor() as i32).clamp(0, 9) as u8;
+                if enemy.type_id != 0 {
+                    let mut updated_enemy = enemy.clone();
+                    let world_mouse_x = pos.x - scr_rect.min.x;
+                    let world_mouse_y = pos.y - scr_rect.min.y;
+                    let cell_x = ((world_mouse_x / tile_side).floor() as i32).clamp(0, 14) as u8;
+                    let cell_y = ((world_mouse_y / tile_side).floor() as i32).clamp(0, 9) as u8;
 
-                match handle_type {
-                    0 => {
-                        // 🔥 УЛУЧШЕНИЕ: Стартовая точка теперь перемещается СВОБОДНО.
-                        // Она больше не тащит за собой финишную координату x2/y2.
-                        updated_enemy.x = cell_x;
-                        updated_enemy.y = cell_y;
-                        updated_enemy.x1 = cell_x;
-                        updated_enemy.y1 = cell_y;
+                    match handle_type {
+                        0 => {
+                            updated_enemy.x = cell_x;
+                            updated_enemy.y = cell_y;
+                            updated_enemy.x1 = cell_x;
+                            updated_enemy.y1 = cell_y;
+                        }
+                        2 => {
+                            updated_enemy.x2 = cell_x;
+                            updated_enemy.y2 = cell_y;
+                        }
+                        _ => {}
                     }
-                    2 => {
-                        // Финишная точка также перемещается абсолютно свободно на любую ячейку.
-                        updated_enemy.x2 = cell_x;
-                        updated_enemy.y2 = cell_y;
-                    }
-                    _ => {}
+
+                    sanitize_enemy_boundaries_interactive(&mut updated_enemy);
+                    enemy_to_update = Some((drag_idx, updated_enemy));
                 }
-
-                sanitize_enemy_boundaries_interactive(&mut updated_enemy);
-                enemy_to_update = Some((drag_idx, updated_enemy));
             }
         }
     }
@@ -213,12 +222,11 @@ pub fn render_entities(
         }
     }
 }
-
 fn sanitize_enemy_boundaries_interactive(enemy: &mut Enemy) {
     if enemy.type_id == 0 {
         return;
     }
-    // Синхронизируем базовые Си-привязки
+    // Синхронизируем базовые Си-привязки движка Mojon Twins
     enemy.x1 = enemy.x;
     enemy.y1 = enemy.y;
 
@@ -231,30 +239,53 @@ fn sanitize_enemy_boundaries_interactive(enemy: &mut Enemy) {
     }
 }
 
+// ============================================================================
+// ГРАФИЧЕСКИЙ РЕНДЕРИНГ И ПОДСВЕТКА ДИАГНОСТИЧЕСКИХ РАМОК ОШИБОК
+// ============================================================================
 pub fn render_clash_errors(
     painter: &egui::Painter,
     scr_rect: egui::Rect,
     clash_errors: &[ClashError],
+    current_screen: usize,
     zoom: f32,
 ) {
+    if clash_errors.is_empty() {
+        return;
+    }
+
     for error in clash_errors {
-        let block_step = 16.0 * zoom;
+        // Рисуем ошибку только если она принадлежит именно этому экрану карты!
+        if error.screen_index != current_screen {
+            continue;
+        }
+
+        let is_attribute_clash =
+            error.message.contains("цвет") || error.message.contains("атрибут");
+
+        let block_step = if is_attribute_clash {
+            8.0 * zoom
+        } else {
+            32.0 * zoom
+        };
+
         let err_rect = egui::Rect::from_min_size(
             egui::pos2(
-                scr_rect.min.x + (error.x_block as f32 * block_step),
-                scr_rect.min.y + (error.y_block as f32 * block_step),
+                scr_rect.min.x + (error.cell_x as f32 * block_step),
+                scr_rect.min.y + (error.cell_y as f32 * block_step),
             ),
             egui::vec2(block_step, block_step),
         );
+
         painter.rect_filled(
             err_rect,
             0.0,
-            egui::Color32::from_rgba_unmultiplied(255, 0, 0, 110),
+            egui::Color32::from_rgba_unmultiplied(255, 0, 0, 80),
         );
+
         painter.rect_stroke(
             err_rect,
             0.0,
-            egui::Stroke::new(0.8 * zoom, egui::Color32::RED),
+            egui::Stroke::new(1.2 * zoom, egui::Color32::from_rgb(255, 50, 50)),
         );
     }
 }

@@ -30,6 +30,12 @@ pub fn render(
             sprites_texture, // ФИКС: Пробрасываем текстуру на холст
         );
 
+        // ============================================================================
+        // ИСПРАВЛЕНО: Интегрируем виджет ошибок сразу ПОД холстом карты,
+        // чтобы он всегда оставался перед глазами разработчика и позволял навигироваться
+        // ============================================================================
+        render_collision_warnings_hud(ui, clash_errors, selected_screen);
+
         // Инспектор врагов комнаты (Строго 3 слота для структуры памяти MTE MK1 v5.0)
         let scr_key = format!("screen_{}", selected_screen);
         if let Some(screen_data) = project.screens.get_mut(&scr_key) {
@@ -188,6 +194,7 @@ pub fn render(
                                     if new_ai != enemy.type_id {
                                         enemy.type_id = new_ai;
                                         // Сброс геометрии ручек под правила выбранного ИИ
+                                        // Сброс геометрии ручек под правила выбранного ИИ
                                         match new_ai {
                                             1 => {
                                                 enemy.x1 = enemy.x;
@@ -245,5 +252,78 @@ pub fn render(
                 });
             }
         }
+    });
+}
+
+// ============================================================================
+// НОВОЕ УЛУЧШЕНИЕ: Интерактивный инспектор коллизий мира.
+// Выводит критические ошибки сборки и позволяет в один клик перемещаться
+// к проблемной комнате на глобальной карте.
+// ============================================================================
+fn render_collision_warnings_hud(
+    ui: &mut egui::Ui,
+    clash_errors: &[ClashError],
+    selected_screen: &mut usize,
+) {
+    ui.add_space(4.0);
+    ui.group(|ui| {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.heading("🚨 Аудит коллизий мира");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if clash_errors.is_empty() {
+                        ui.colored_label(egui::Color32::LIGHT_GREEN, "✔ Ошибок нет");
+                    } else {
+                        ui.colored_label(
+                            egui::Color32::LIGHT_RED,
+                            format!("Ошибок: {}", clash_errors.len()),
+                        );
+                    }
+                });
+            });
+            ui.separator();
+
+            if clash_errors.is_empty() {
+                ui.small(
+                    "Все сущности и предметы распределены корректно. Движок Z80 в безопасности.",
+                );
+            } else {
+                // Ограничиваем панель ошибок по высоте со скроллбаром, чтобы не ломать основной UI
+                egui::ScrollArea::vertical()
+                    .max_height(100.0)
+                    .show(ui, |ui| {
+                        for error in clash_errors {
+                            let item_text = format!(
+                                "• [Экран {}] Ячейка ({}, {}): {}",
+                                error.screen_index, error.cell_x, error.cell_y, error.message
+                            );
+
+                            let text_color = match error.severity {
+                                crate::core::validator::ErrorSeverity::Critical => {
+                                    egui::Color32::from_rgb(255, 100, 100)
+                                }
+                                crate::core::validator::ErrorSeverity::Warning => {
+                                    egui::Color32::from_rgb(255, 200, 50)
+                                }
+                            };
+
+                            // Делаем строку интерактивной кнопкой-ссылкой
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        egui::RichText::new(item_text).color(text_color).small(),
+                                    )
+                                    .wrap(true)
+                                    .frame(false),
+                                )
+                                .clicked()
+                            {
+                                // ФОКУСИРОВКА: В один клик переключаем редактор на сбойный экран!
+                                *selected_screen = error.screen_index;
+                            }
+                        }
+                    });
+            }
+        });
     });
 }

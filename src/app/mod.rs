@@ -10,6 +10,8 @@ pub mod wizard;
 // Экспортируем структуру приложения наружу для всего остального проекта
 pub use app_struct::ZxIdeApp;
 
+use crate::core::validator::world_collisions::WorldValidator;
+use crate::core::validator::ClashError;
 use crate::models::ProjectData;
 use eframe::egui;
 use egui_dock::{DockArea, DockState, Style};
@@ -30,7 +32,7 @@ impl ZxIdeApp {
             project: ProjectData::default(),
             current_tab: Tab::MapEditor,
             selected_screen: 0,
-            selected_tile: 1,
+            selected_tile: 0,
             script_text: "ENTERING SCREEN 0\nIF FLAG 1 = 0\nTHEN\n\tSET TILE (5, 5) = 14\nEND"
                 .to_string(),
             status_message: "IDE успешно инициализирована".to_string(),
@@ -90,6 +92,61 @@ impl eframe::App for ZxIdeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_zoom_factor(1.15);
 
+        // ============================================================================
+        // ИСПРАВЛЕНО: Жёсткая изоляция аудита. На холст карты комнат должны попадать
+        // ИСКЛЮЧИТЕЛЬНО критические ошибки застревания сущностей в стенах (World Collisions).
+        // Ошибки цветового наложения (Attribute Clash) заставки удаляются из этого среза,
+        // что гарантированно ликвидирует три призрачных квадрата в координатах (2,4), (2,8), (10,3).
+        // ============================================================================
+        if !self.wizard_active {
+            let mut current_errors = WorldValidator::validate_world(&self.project);
+
+            // Фильтруем массив: оставляем только те ошибки, которые сгенерированы WorldValidator.
+            // Графические ошибки attribute clash (если они содержат слова "цвет", "атрибут" или "clash")
+            // безжалостно вырезаются из контекста редактора карт комнат.
+            current_errors.retain(|err| {
+                !err.message.contains("цвет")
+                    && !err.message.contains("атрибут")
+                    && !err.message.contains("Clash")
+            });
+
+            let scr_key = format!("screen_{}", self.selected_screen);
+            if let Some(screen_data) = self.project.screens.get(&scr_key) {
+                // Если все враги на экране стёрты (TypeID == 0) — принудительно очищаем ошибки этого экрана
+                let has_active_entities = screen_data.enemies.iter().any(|e| e.type_id != 0)
+                    || screen_data.hotspot.type_id != 0;
+
+                if !has_active_entities {
+                    current_errors.retain(|err| err.screen_index != self.selected_screen);
+                }
+
+                // Формируем диагностический отчет для вкладки «Логи компиляции»
+                let mut debug_log = format!(
+                    "🔍 ДИАГНОСТИКА ЭКРАНА {} (Ключ: {})\n",
+                    self.selected_screen, scr_key
+                );
+                debug_log.push_str(&format!(
+                    "• Активных (живых) врагов: {}\n",
+                    screen_data
+                        .enemies
+                        .iter()
+                        .filter(|e| e.type_id != 0)
+                        .count()
+                ));
+                debug_log.push_str(&format!(
+                    "• Ошибок коллизий в базе холста: {}\n",
+                    current_errors
+                        .iter()
+                        .filter(|e| e.screen_index == self.selected_screen)
+                        .count()
+                ));
+
+                self.status_message = debug_log;
+            }
+
+            self.clash_errors = current_errors;
+        }
+
         // 1. Применяем шрифты и оформление из модуля темы
         theme::apply_modern_dark_theme(ctx);
 
@@ -143,6 +200,16 @@ impl eframe::App for ZxIdeApp {
                 dock_style.tab.inactive.rounding = egui::Rounding::same(0.0);
                 dock_style.tab.focused.rounding = egui::Rounding::same(0.0);
 
+                let safe_clash_errors: &[ClashError] = if self
+                    .clash_errors
+                    .iter()
+                    .any(|e| e.screen_index == self.selected_screen)
+                {
+                    &self.clash_errors
+                } else {
+                    &[] // Теперь пустой срез идеально совпадает по типу!
+                };
+
                 let mut viewer = ZxTabViewer {
                     project: &mut self.project,
                     project_name: &self.project_name,
@@ -151,7 +218,7 @@ impl eframe::App for ZxIdeApp {
                     selected_screen: &mut self.selected_screen,
                     selected_tile: &mut self.selected_tile,
                     script_text: &mut self.script_text,
-                    clash_errors: &self.clash_errors,
+                    clash_errors: safe_clash_errors, // Передаем чистый отфильтрованный срез
                     status_message: &self.status_message,
                     map_edit_mode: &mut self.map_edit_mode,
                     selected_enemy_type: &mut self.selected_enemy_type,

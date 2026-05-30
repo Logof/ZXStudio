@@ -110,8 +110,22 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 render_hud_editor(ui, self.project, &self.hud_frame_texture);
             }
             CustomTab::Console => {
-                ui.heading("Логи сборки проекта");
-                ui.colored_label(egui::Color32::LIGHT_BLUE, self.status_message);
+                ui.heading("💻 Системный дамп и логи сборки проекта");
+                ui.add_space(6.0);
+
+                // ============================================================================
+                // ИСПРАВЛЕНО: Вывод лога в виде многострочного защищенного текстового поля
+                // со скроллбаром и моноширинным шрифтом для удобного анализа дампов памяти.
+                // ============================================================================
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.status_message.to_string())
+                            .font(egui::FontId::monospace(11.0))
+                            .desired_rows(15)
+                            .lock_focus(true)
+                            .desired_width(ui.available_width()),
+                    );
+                });
             }
         }
     }

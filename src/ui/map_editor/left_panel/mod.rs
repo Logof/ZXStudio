@@ -1,3 +1,4 @@
+// src/ui/map_editor/left_panel/mod.rs
 use crate::app::states::MapEditMode;
 use crate::models::ProjectData;
 use eframe::egui;
@@ -12,15 +13,11 @@ pub fn render(
     map_edit_mode: &mut MapEditMode,
     selected_tile: &mut u8,
     selected_enemy_sprite_slot: &mut u8,
-    // ============================================================================
-    // ИСПРАВЛЕНО: Левая панель теперь принимает срез нарезанных текстур тайлов
-    // ============================================================================
     sliced_tile_textures: &[egui::TextureHandle],
     sprites_texture: &Option<egui::TextureHandle>,
 ) {
     let total_height = ui.available_height();
 
-    // Оборачиваем в аккуратную группу на всю доступную ширину родительского контейнера
     egui::Frame::group(ui.style())
         .inner_margin(8.0)
         .show(ui, |ui| {
@@ -30,9 +27,12 @@ pub fn render(
                 .id_source("left_editor_scroll")
                 .max_height(ui.available_height())
                 .show(ui, |ui| {
-                    ui.label("💡 Активный слой:");
-                    ui.radio_value(map_edit_mode, MapEditMode::Tiles, "🧱 Статические тайлы");
-                    ui.radio_value(map_edit_mode, MapEditMode::Enemies, "👾 Враги");
+                    ui.label("💡 Активный инструмент:");
+                    ui.radio_value(map_edit_mode, MapEditMode::Tiles, "🧱 Рисовать тайлы");
+                    ui.radio_value(map_edit_mode, MapEditMode::Enemies, "👾 Рисовать врагов");
+
+                    // 🔥 ИСПРАВЛЕНО: Добавлена выделенная кнопка ластика, которая включает очистку на холсте
+                    ui.radio_value(map_edit_mode, MapEditMode::Eraser, "🧽 Ластик очистки");
 
                     ui.add_space(6.0);
                     ui.separator();
@@ -40,7 +40,6 @@ pub fn render(
 
                     match map_edit_mode {
                         MapEditMode::Tiles => {
-                            // ИСПРАВЛЕНО: Передаем срез нарезанных текстур в палитру
                             tiles_palette::render(ui, project, selected_tile, sliced_tile_textures);
                         }
                         MapEditMode::Enemies => {
@@ -51,6 +50,14 @@ pub fn render(
                                 sprites_texture,
                                 selected_screen,
                             );
+                        }
+                        MapEditMode::Eraser => {
+                            ui.group(|ui| {
+                                ui.label("🧽 Режим ластика активен");
+                                ui.small("Кликните ЛКМ на холсте карты, чтобы стереть:");
+                                ui.small("• Спрайт врага (если курсор над врагом)");
+                                ui.small("• Текущий тайл карты (заменяется на пустой тайл 0)");
+                            });
                         }
                     }
                 });

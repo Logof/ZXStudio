@@ -1,3 +1,4 @@
+// src/ui/map_editor/map_canvas/tile_layer.rs
 use crate::models::ScreenData;
 use eframe::egui;
 
@@ -25,13 +26,39 @@ pub fn render_tiles(
                 let uv_rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
                 painter.image(tex.id(), tile_rect, uv_rect, egui::Color32::WHITE);
             } else {
+                // ============================================================================
+                // ИСПРАВЛЕНО: Убираем сплошной ядовито-красный цвет заглушек тайлов!
+                // Теперь нерасшифрованные замки (ID 15) подсвечиваются мягким контуром,
+                // а внутри пишется их реальный ID, чтобы не путать графику с ошибками коллизий.
+                // ============================================================================
                 let fill_color = match tile_id {
-                    14 => egui::Color32::from_rgb(50, 100, 200), // Синий для пуш-блока
-                    15 => egui::Color32::from_rgb(200, 50, 50),  // Красный для замка
-                    0 => egui::Color32::BLACK,
-                    _ => egui::Color32::from_gray(60),
+                    14 => egui::Color32::from_rgba_unmultiplied(50, 120, 240, 40), // Мягкий синий плейсхолдер пуш-бокса
+                    15 => egui::Color32::from_rgba_unmultiplied(240, 100, 100, 40), // Мягкий розовый плейсхолдер замка
+                    0 => egui::Color32::from_rgb(14, 14, 17), // Чистый темный фон Spectrum
+                    _ => egui::Color32::from_rgb(30, 30, 35), // Нейтральный серый декор
                 };
+
                 painter.rect_filled(tile_rect, 0.0, fill_color);
+
+                // Рисуем рамку и номер тайла для любого не-нулевого блока
+                if tile_id != 0 {
+                    painter.rect_stroke(
+                        tile_rect,
+                        0.0,
+                        egui::Stroke::new(
+                            1.0 * zoom,
+                            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 40),
+                        ),
+                    );
+
+                    painter.text(
+                        tile_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        format!("{}", tile_id),
+                        egui::FontId::proportional(10.0 * zoom),
+                        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 140),
+                    );
+                }
             }
         }
     }
@@ -48,8 +75,6 @@ pub fn render_tiles(
             egui::vec2(32.0 * zoom, 32.0 * zoom),
         );
 
-        // Определяем графический индекс тайла для превью на основе типа хотспота
-        // Переводим внутренний Си-тип обратно в индекс палитры для наглядности художника
         let source_tile_id = match hs.type_id {
             1 => 18, // Hotspot 1 -> Ключ (Тайл 18)
             2 => 16, // Hotspot 2 -> Жизнь (Тайл 16)
@@ -58,11 +83,9 @@ pub fn render_tiles(
         };
 
         if let Some(tex) = sliced_tile_textures.get(source_tile_id) {
-            // Рисуем сам спрайт предмета из палитры
             let uv_rect = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
             painter.image(tex.id(), hs_rect, uv_rect, egui::Color32::WHITE);
 
-            // Накладываем полупрозрачную цветную рамку-маркер, чтобы геймдизайнер видел, что это спец-зона
             let marker_color = match hs.type_id {
                 1 => egui::Color32::from_rgba_unmultiplied(255, 200, 0, 80), // Золотая рамка для Ключа
                 2 => egui::Color32::from_rgba_unmultiplied(255, 50, 50, 80), // Красная рамка для Жизни
@@ -71,7 +94,6 @@ pub fn render_tiles(
             };
             painter.rect_stroke(hs_rect, 0.0, egui::Stroke::new(1.5 * zoom, marker_color));
         } else {
-            // Текстовый плейсхолдер, если графика work.png ещё не подгружена
             let (label, color) = match hs.type_id {
                 1 => ("🔑 KEY", egui::Color32::GOLD),
                 2 => ("❤️ LIFE", egui::Color32::LIGHT_RED),

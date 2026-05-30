@@ -19,6 +19,7 @@ pub enum WizardStep {
 pub enum MapEditMode {
     Tiles,
     Enemies,
+    Eraser,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]

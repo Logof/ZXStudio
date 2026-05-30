@@ -70,12 +70,13 @@ pub fn render_map_canvas(
             }
         }
 
+        // Проверяем, держит ли пользователь мышку в состоянии перетаскивания (тела или ручки)
         let is_dragging_ai_handle = ui
             .ctx()
             .data(|d| d.get_temp::<usize>(active_drag_enemy_id).is_some());
 
         // ============================================================================
-        // ОБРАБОТКА ВВОДА: ВЫДЕЛЕНИЕ (ПКЛ) И СПАВН (ЛКМ) С АВТОСИНХРОНИЗАЦИЕЙ ХОТСПОРТОВ
+        // ОБРАБОТКА ВВОДА: ВЫДЕЛЕНИЕ (ПКЛ), СПАВН (КЛИК ЛКМ) И УНИВЕРСАЛЬНЫЙ ЛАСТИК
         // ============================================================================
         if let Some((scr_idx, cell_x, cell_y)) = virtual_cell_pos {
             let scr_key = format!("screen_{}", scr_idx);
@@ -89,7 +90,7 @@ pub fn render_map_canvas(
                 if let Some(found_enemy) = screen_data
                     .enemies
                     .iter()
-                    .find(|e| e.x == cell_x && e.y == cell_y)
+                    .find(|e| e.type_id != 0 && e.x == cell_x && e.y == cell_y)
                 {
                     ui.ctx()
                         .data_mut(|d| d.insert_temp(id_context_enemy, found_enemy.id));
@@ -121,9 +122,6 @@ pub fn render_map_canvas(
                         if (is_primary_drag || is_primary_click)
                             && !ui.ctx().input(|i| i.modifiers.ctrl)
                         {
-                            // ============================================================================
-                            // ИСПРАВЛЕНО: Вместо прямой перезаписи матрицы вызываем метод ядра с авто-апдейтом хотспотов
-                            // ============================================================================
                             screen_data.set_tile_and_sync(
                                 cell_x,
                                 cell_y,
@@ -133,75 +131,106 @@ pub fn render_map_canvas(
                         }
                     }
                     MapEditMode::Enemies => {
-                        if is_primary_click {
-                            let has_enemy_at_cell = screen_data
-                                .enemies
-                                .iter()
-                                .any(|e| e.x == cell_x && e.y == cell_y);
+                        // Ищем, есть ли живой враг строго в текущей ячейке под курсором
+                        let existing_enemy_idx = screen_data
+                            .enemies
+                            .iter()
+                            .position(|e| e.type_id != 0 && e.x == cell_x && e.y == cell_y);
 
-                            if !has_enemy_at_cell && screen_data.enemies.len() < 3 {
-                                let id_ai = egui::Id::new("default_enemy_ai_type_ctx");
-                                let current_default_ai =
-                                    ui.ctx().data(|d| d.get_temp::<u8>(id_ai)).unwrap_or(1);
-                                let mut forced_ai_by_slot = current_default_ai;
+                        // ИСПРАВЛЕНО: Новый враг создается ТОЛЬКО по одиночному клику (не драгу!),
+                        // и только если ячейка абсолютно свободна. Это исключает дублирование при Drag&Drop.
+                        if is_primary_click && existing_enemy_idx.is_none() {
+                            let id_ai = egui::Id::new("default_enemy_ai_type_ctx");
+                            let current_default_ai =
+                                ui.ctx().data(|d| d.get_temp::<u8>(id_ai)).unwrap_or(1);
+                            let mut forced_ai_by_slot = current_default_ai;
 
-                                if current_default_ai == 1 {
-                                    forced_ai_by_slot = match selected_enemy_sprite_slot {
-                                        0 => 1,
-                                        1 => 6,
-                                        2 => 9,
-                                        3 => 4,
-                                        _ => 1,
-                                    };
-                                }
-
-                                use std::time::{SystemTime, UNIX_EPOCH};
-                                let unique_id = SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_nanos()
-                                    as u64;
-
-                                let mut new_enemy = crate::models::screen::Enemy {
-                                    id: unique_id,
-                                    x: cell_x,
-                                    y: cell_y,
-                                    x1: cell_x,
-                                    y1: cell_y,
-                                    x2: cell_x,
-                                    y2: cell_y,
-                                    type_id: forced_ai_by_slot,
-                                    sprite_slot: selected_enemy_sprite_slot,
-                                    speed: 2,
+                            if current_default_ai == 1 {
+                                forced_ai_by_slot = match selected_enemy_sprite_slot {
+                                    0 => 1,
+                                    1 => 6,
+                                    2 => 9,
+                                    3 => 4,
+                                    _ => 1,
                                 };
+                            }
 
-                                match forced_ai_by_slot {
-                                    1..=3 => {
-                                        new_enemy.x2 = (cell_x + 2).min(14);
-                                    }
-                                    7..=10 => {
-                                        new_enemy.x1 = cell_x.saturating_sub(1);
-                                        new_enemy.x2 = (cell_x + 2).min(14);
-                                        new_enemy.y1 = cell_y.saturating_sub(1);
+                            use std::time::{SystemTime, UNIX_EPOCH};
+                            let unique_id = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_nanos() as u64;
+
+                            let mut new_enemy = crate::models::screen::Enemy {
+                                id: unique_id,
+                                x: cell_x,
+                                y: cell_y,
+                                x1: cell_x,
+                                y1: cell_y,
+                                x2: cell_x,
+                                y2: cell_y,
+                                type_id: forced_ai_by_slot,
+                                sprite_slot: selected_enemy_sprite_slot,
+                                speed: 2,
+                            };
+
+                            // Рассчитываем дефолтные траектории под выбранный ИИ
+                            match forced_ai_by_slot {
+                                1..=3 => {
+                                    new_enemy.x2 = (cell_x + 2).min(14);
+                                }
+                                7..=10 => {
+                                    new_enemy.x1 = cell_x.saturating_sub(1);
+                                    new_enemy.x2 = (cell_x + 2).min(14);
+                                    new_enemy.y1 = cell_y.saturating_sub(1);
+                                    new_enemy.y2 = (cell_y + 2).min(9);
+                                }
+                                5 | 6 => {
+                                    new_enemy.x1 = 0;
+                                    new_enemy.x2 = 0;
+                                    new_enemy.y1 = 0;
+                                    new_enemy.y2 = 0;
+                                }
+                                4 => {
+                                    if !is_top_down {
                                         new_enemy.y2 = (cell_y + 2).min(9);
                                     }
-                                    5 | 6 => {
-                                        new_enemy.x1 = 0;
-                                        new_enemy.x2 = 0;
-                                        new_enemy.y1 = 0;
-                                        new_enemy.y2 = 0;
-                                    }
-                                    4 => {
-                                        if !is_top_down {
-                                            new_enemy.y2 = (cell_y + 2).min(9);
-                                        }
-                                    }
-                                    _ => {
-                                        new_enemy.x2 = (cell_x + 2).min(14);
-                                        new_enemy.y2 = cell_y;
-                                    }
                                 }
+                                _ => {
+                                    new_enemy.x2 = (cell_x + 2).min(14);
+                                    new_enemy.y2 = cell_y;
+                                }
+                            }
+
+                            // Переиспользуем свободный резерв памяти
+                            let dead_slot_idx =
+                                screen_data.enemies.iter().position(|e| e.type_id == 0);
+
+                            if let Some(slot_idx) = dead_slot_idx {
+                                screen_data.enemies[slot_idx] = new_enemy;
+                            } else if screen_data.enemies.len() < 3 {
                                 screen_data.enemies.push(new_enemy);
+                            }
+                        }
+                    }
+                    MapEditMode::Eraser => {
+                        // ============================================================================
+                        // ВЫДЕЛЕННЫЙ ИНСТРУМЕНТ ЛАСТИКА (Одиночный клик или протягивание мыши)
+                        // ============================================================================
+                        if is_primary_click || is_primary_drag {
+                            let existing_enemy_idx = screen_data
+                                .enemies
+                                .iter()
+                                .position(|e| e.type_id != 0 && e.x == cell_x && e.y == cell_y);
+
+                            if let Some(idx) = existing_enemy_idx {
+                                // 1. Сначала стираем врага из этой ячейки
+                                screen_data.enemies[idx].type_id = 0;
+                                ui.ctx()
+                                    .data_mut(|d| d.remove_temp::<u64>(id_context_enemy));
+                            } else {
+                                // 2. Если врага в ячейке нет — стираем тайл карты (зануляем в ID 0)
+                                screen_data.set_tile_and_sync(cell_x, cell_y, 0, project.tile_mode);
                             }
                         }
                     }
@@ -238,7 +267,6 @@ pub fn render_map_canvas(
                     .cloned()
                     .unwrap_or_else(ScreenData::default);
 
-                // ИСПРАВЛЕНО: Передаем нарезанный массив текстур вместо старой монолитной текстуры
                 tile_layer::render_tiles(
                     &painter,
                     view_rect,
@@ -260,7 +288,6 @@ pub fn render_map_canvas(
                     }
                 }
 
-                // Подсветка рамки выделенного экрана
                 let border_stroke = if current_scr_idx == *selected_screen {
                     egui::Stroke::new(2.5, egui::Color32::from_rgb(255, 180, 0))
                 } else {
@@ -271,7 +298,7 @@ pub fn render_map_canvas(
                 };
                 painter.rect_stroke(view_rect, 0.0, border_stroke);
 
-                // Если внутри рендеринга врагов кликнули ПКЛ по ручке — Inspector подхватит
+                // Отрисовка сущностей (Drag & Drop ручек и тела теперь работает плавно)
                 entity_layer::render_entities(
                     ui,
                     &painter,
@@ -285,7 +312,6 @@ pub fn render_map_canvas(
                     is_top_down,
                 );
 
-                // Если у какого-то врага на холсте совпадает ID с выделенным, подсветим его тонкой золотой рамкой
                 if let Some(target_id) = selected_enemy_id {
                     if let Some(e) = screen_data.enemies.iter().find(|e| e.id == target_id) {
                         let e_rect = egui::Rect::from_min_size(
@@ -310,6 +336,7 @@ pub fn render_map_canvas(
                         &painter,
                         view_rect,
                         clash_errors,
+                        current_scr_idx,
                         camera.zoom,
                     );
                 }
