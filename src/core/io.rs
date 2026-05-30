@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 // Импортируем наши декомпозированные атомарные Си-экспортеры
 use super::exporter::exporter_config::build_and_write_config_h;
 use super::exporter::exporter_enemies::build_enemies_source;
-use super::exporter::exporter_hotspots::build_hotspots_source;
+// ИСПРАВЛЕНО: Вместо устаревшего изолированного экспортера хотспотов подключаем компилятор карты
+use super::exporter::exporter_map::build_map_source;
 
 pub fn save_project_json(
     project_path: &str,
@@ -54,17 +55,34 @@ pub fn export_enems_h(project_path: &str, project: &ProjectData) -> Result<(), s
     let mut final_source = String::new();
     final_source.push_str("// MTE MK1 (la Churrera) v4\n// Generated автоматически из декомпозированных модулей Rust IDE\n\n");
 
+    // Вызываем обновленный экспортер, который монолитно упаковывает и malotes, и hotspots в один файл enems.h
     let enemies_code = build_enemies_source(project, total_screens);
     final_source.push_str(&enemies_code);
-    final_source.push_str(
-        "\n// ----------------------------------------------------------------------------\n\n",
-    );
-
-    let hotspots_code = build_hotspots_source(project, total_screens);
-    final_source.push_str(&hotspots_code);
 
     let mut file = fs::File::create(target_path)?;
     file.write_all(final_source.as_bytes())?;
+    Ok(())
+}
+
+// ============================================================================
+// НОВОЕ УЛУЧШЕНИЕ: Диспетчер автоматической сборки и 4-битной упаковки map.h
+// ============================================================================
+pub fn export_map_h(project_path: &str, project: &ProjectData) -> Result<(), std::io::Error> {
+    let game_root = Path::new(project_path);
+
+    if !game_root.exists() {
+        fs::create_dir_all(&game_root)?;
+    }
+
+    // Запекаем карту в штатную директорию дерева ресурсов Mojon Twins
+    let target_path = game_root.join("map/map.h");
+    let total_screens = project.config.map_goals.map_w * project.config.map_goals.map_h;
+
+    // Вызываем компилятор карты с адаптивной логикой сжатия нибблов (4 бита / 8 бит)
+    let map_code = build_map_source(project, total_screens);
+
+    let mut file = fs::File::create(target_path)?;
+    file.write_all(map_code.as_bytes())?;
     Ok(())
 }
 
@@ -92,7 +110,7 @@ pub fn create_project_structure(
     fs::create_dir_all(&root_dir)
         .map_err(|e| format!("Не удалось создать корневую папку проекта: {}", e))?;
 
-    // 3. Разворачиваем эталонное дерево подпапок согласно Промышленной Спецификации (Пункт 4)
+    // 3. Разворачиваем эталонное дерево подпапок согласно Промышленной Спецификации
     let sub_folders = ["bin", "dev", "gfx", "map", "mus", "script"];
     for folder in &sub_folders {
         let sub_dir = root_dir.join(folder);

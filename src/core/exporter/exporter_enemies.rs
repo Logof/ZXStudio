@@ -1,7 +1,7 @@
 // src/core/exporter/exporter_enemies.rs
 use crate::models::ProjectData;
 
-/// Сборка Си-кода массива malotes, дефайнов количества врагов и массива hotspots (ТЗ: Автовыгрузка в enemies.h)
+/// Сборка Си-кода массива malotes, дефайнов количества врагов и массива hotspots
 pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String {
     let mut n_enems_type = vec![0; 15]; // Индексы 0..14 под типы ИИ врагов
     let mut body = String::new();
@@ -31,7 +31,7 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
         // Защитный лимит: в оригинальном движке на экране строго до 3 врагов
         screen_enemies.truncate(3);
 
-        // ФИКС: Дополняем массив пустыми структурами (t = 0),
+        // Дополняем массив пустыми структурами (t = 0),
         // чтобы сохранить фиксированный шаг смещения комнат в памяти Спектрума
         while screen_enemies.len() < 3 {
             screen_enemies.push(crate::models::screen::Enemy {
@@ -49,21 +49,19 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
         }
 
         for enemy in &screen_enemies {
-            // Переводим координаты сетки IDE (тайлы 32х32) в пиксели экрана Спектрума (шаг 32)
-            // Движок La Churrera оперирует пиксельными границами для плавного попиксельного сдвига
-            let x_px = enemy.x * 32;
-            let y_px = enemy.y * 32;
+            // Безопасный расчет пикселей в u16 для защиты от переполнений (integer overflow)
+            // Ограничиваем координаты штатными размерами экрана (X: 15*32=480, но u8 лимит 240, Y: 10*32=320)
+            let x_px = ((enemy.x as u16) * 32).clamp(0, 240) as u8;
+            let y_px = ((enemy.y as u16) * 32).clamp(0, 240) as u8;
 
-            // Настройка жестких логических привязок по вашему ТЗ:
-            // x1, y1 — это всегда место старта сущности на карте
-            let x1_px = enemy.x1 * 32;
-            let y1_px = enemy.y1 * 32;
-            // x2, y2 — это всегда место финиша, куда направлен вектор движения
-            let x2_px = enemy.x2 * 32;
-            let y2_px = enemy.y2 * 32;
+            // Настройка жестких логических привязок с защитой от мусорных данных в ОЗУ/JSON
+            let x1_px = ((enemy.x1 as u16) * 32).clamp(0, 240) as u8;
+            let y1_px = ((enemy.y1 as u16) * 32).clamp(0, 240) as u8;
+            let x2_px = ((enemy.x2 as u16) * 32).clamp(0, 240) as u8;
+            let y2_px = ((enemy.y2 as u16) * 32).clamp(0, 240) as u8;
 
             // Вычисление стартовых векторов смещения mx/my на основе выбранного типа ИИ
-            let (mx, my) = if enemy.type_id == 0 {
+            let (mx, my): (i8, i8) = if enemy.type_id == 0 {
                 (0, 0)
             } else {
                 match enemy.type_id {
@@ -73,9 +71,7 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
                     4 => {
                         if is_top_down {
                             (0, 0)
-                        }
-                        // Преследователь рассчитывает вектор динамически
-                        else {
+                        } else {
                             (0, -1)
                         } // Платформа-лифт: старт ВВЕРХ
                     }
@@ -91,24 +87,26 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
                 }
             };
 
-            // Скорость движения Attr берется из поля enemy.attr, прописанного в палитре.
-            // Если враг пустой (tp=0), скорость принудительно обнуляем
-            let current_speed = if enemy.type_id == 0 { 0 } else { enemy.speed };
+            // Ограничиваем скорость штатными рамками (0..4) и предотвращаем мусорные оверфлоу
+            let safe_speed = if enemy.type_id == 0 {
+                0
+            } else {
+                enemy.speed.clamp(0, 4)
+            } as i16;
 
-            // Умножаем стартовые вектора на скорость движения (Attr) для Си-логики шага
-            let final_mx = mx * current_speed as i8;
-            let final_my = my * current_speed as i8;
+            // Расчет векторов шага выполняем в безопасном i16 диапазоне, затем кастуем обратно в i8
+            let final_mx = (mx as i16 * safe_speed) as i8;
+            let final_my = (my as i16 * safe_speed) as i8;
 
-            // ФИКС ПОРЯДКА ПОЛЕЙ: Строго подгоняем под typedef struct MALOTE
-            // x, y, x1, y1, x2, y2, mx, my, t
+            // Выгружаем подогнанные под typedef struct MALOTE поля
             body.push_str(&format!(
                 "\t {{ {}, {}, {}, {}, {}, {}, {}, {}, {} }},\n",
                 x_px,          // x
                 y_px,          // y
-                x1_px,         // x1 (Исправлено на позицию старта)
-                y1_px,         // y1 (Исправлено на позицию старта)
-                x2_px,         // x2 (Куда движется)
-                y2_px,         // y2 (Куда движется)
+                x1_px,         // x1
+                y1_px,         // y1
+                x2_px,         // x2
+                y2_px,         // y2
                 final_mx,      // mx (Вектор шага по X)
                 final_my,      // my (Вектор шага по Y)
                 enemy.type_id  // t  (Тип ИИ врага)
@@ -126,9 +124,7 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
     }
     body.push_str("};\n\n");
 
-    // ============================================================================
-    // НОВОЕ УЛУЧШЕНИЕ: Автогенерация Си-массива hotspots на базе служебных тайлов
-    // ============================================================================
+    // Автогенерация Си-массива hotspots на базе служебных тайлов
     body.push_str("unsigned char hotspots [] = {\n");
 
     for i in 0..total_screens {
@@ -154,7 +150,9 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
         body.push_str(&format!("#define N_ENEMS_TYPE_{} {}\n", type_id, count));
     }
 
-    // Суммарный лимит BADDIES_COUNT (типы 1 + 2 + 3)
+    // ============================================================================
+    // ИСПРАВЛЕНО: Прямое суммирование элементов массива по индексам 1, 2 и 3
+    // ============================================================================
     let baddies_count = n_enems_type[1] + n_enems_type[2] + n_enems_type[3];
     body.push_str(&format!("\n#define BADDIES_COUNT {}\n", baddies_count));
 
