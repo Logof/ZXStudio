@@ -1,3 +1,4 @@
+// src/app/asset_loader.rs
 use crate::app::ZxIdeApp;
 use crate::core::image_processor::TileSlicer;
 use eframe::egui;
@@ -6,6 +7,9 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
     if app.wizard_active {
         return;
     }
+
+    // Определяем текущий язык из кэша перевода, чтобы динамически локализовать логи
+    let is_english = app.translations.menu.lang_select.contains("Language");
 
     // Перехват сигналов смены графического режима из конфигуратора
     let reset_flag = egui::Id::new("trigger_reset_tileset_graphics");
@@ -23,6 +27,18 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
     if need_clear {
         app.sliced_tile_textures.clear(); // Мгновенно опустошаем палитру, убирая залипание старого режима
     }
+
+    // ============================================================================
+    // ИСПРАВЛЕНИЕ: Перехват глобального сигнала сброса кэша масок спрайтов
+    // ============================================================================
+    let id_mask_flag = egui::Id::new("sprites_mask_calculated_flag");
+    // Если текстура спрайтов сброшена в None (из-за переключения проекта), принудительно стираем флаг маски
+    if app.sprites_texture.is_none() {
+        ctx.data_mut(|d| {
+            let _ = d.remove_temp::<bool>(id_mask_flag);
+        });
+    }
+    // ============================================================================
 
     // Собираем базовый путь
     let gfx_dir = std::path::Path::new(&app.project_path).join("gfx");
@@ -62,11 +78,21 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
                         app.sliced_tile_textures.push(tex_handle);
                     }
                     loaded_successfully = true;
-                    app.status_message = format!(
-                        "⚡ Тайлсет синхронизирован! Нарезано тайлов: {} (Режим: {})",
-                        app.sliced_tile_textures.len(),
-                        current_mode.name()
-                    );
+
+                    // ЛOКАЛИЗАЦИЯ СТАТУСА ТАЙЛСЕТА
+                    app.status_message = if is_english {
+                        format!(
+                            "⚡ Tileset synchronized! Sliced tiles: {} (Mode: {})",
+                            app.sliced_tile_textures.len(),
+                            current_mode.name()
+                        )
+                    } else {
+                        format!(
+                            "⚡ Тайлсет синхронизирован! Нарезано тайлов: {} (Режим: {})",
+                            app.sliced_tile_textures.len(),
+                            current_mode.name()
+                        )
+                    };
                 }
             }
         }
@@ -90,11 +116,21 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
                 );
                 app.sliced_tile_textures.push(tex_handle);
             }
-            app.status_message = format!(
-                "ℹ️ Созданы заглушки палитры ({} шт.) для режима: {}. Обновите gfx/work.png!",
-                expected_tiles_count,
-                current_mode.name()
-            );
+
+            // ЛОКАЛИЗАЦИЯ СТАТУСА ЗАГЛУШЕК
+            app.status_message = if is_english {
+                format!(
+                    "ℹ️ Created palette placeholders ({} pcs) for mode: {}. Update gfx/work.png!",
+                    expected_tiles_count,
+                    current_mode.name()
+                )
+            } else {
+                format!(
+                    "ℹ️ Созданы заглушки палитры ({} шт.) для режима: {}. Обновите gfx/work.png!",
+                    expected_tiles_count,
+                    current_mode.name()
+                )
+            };
         }
     }
 
@@ -102,7 +138,6 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
     if app.sprites_texture.is_none() {
         let sprites_path = gfx_dir.join("sprites.png");
         if sprites_path.exists() && sprites_path.is_file() {
-            let id_mask_flag = egui::Id::new("sprites_mask_calculated_flag");
             let already_calculated = ctx
                 .data(|d| d.get_temp::<bool>(id_mask_flag))
                 .unwrap_or(false);
@@ -114,9 +149,12 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
                 if mask_result.is_ok() {
                     ctx.data_mut(|d| d.insert_temp(id_mask_flag, true));
                 } else {
-                    app.status_message =
+                    app.status_message = if is_english {
+                        "⚠️ Warning: Failed to generate automatic sprite masks".to_string()
+                    } else {
                         "⚠️ Предупреждение: Не удалось сгенерировать автоматические маски спрайтов"
-                            .to_string();
+                            .to_string()
+                    };
                 }
             }
 
@@ -129,7 +167,11 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
                     ));
                 }
                 Err(err) => {
-                    app.status_message = format!("❌ Ошибка декодирования sprites.png: {}", err);
+                    app.status_message = if is_english {
+                        format!("❌ Error decoding sprites.png: {}", err)
+                    } else {
+                        format!("❌ Ошибка декодирования sprites.png: {}", err)
+                    };
                 }
             }
         }
@@ -148,7 +190,11 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
                     ));
                 }
                 Err(err) => {
-                    app.status_message = format!("⚠️ Не удалось декодировать marco.png: {}", err);
+                    app.status_message = if is_english {
+                        format!("⚠️ Failed to decode marco.png: {}", err)
+                    } else {
+                        format!("⚠️ Не удалось декодировать marco.png: {}", err)
+                    };
                 }
             }
         }

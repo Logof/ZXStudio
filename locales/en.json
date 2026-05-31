@@ -1,0 +1,45 @@
+{
+  "menu": {
+    "project": "📁 Project",
+    "new_project": "✨ New Project (Wizard)...",
+    "open_project": "📂 Open Project...",
+    "recent_projects": "⏱️ Recent Projects",
+    "empty_list": "List is empty",
+    "save_json": "💾 Save JSON",
+    "gen_c_code": "⚙️ Generate C Code",
+    "close_project": "❌ Close Current Project",
+    "exit": "🚪 Exit",
+    "utilities": "🛠️ Utilities",
+    "clear_cache": "🧹 Clear Build Cache",
+    "window": "📺 Window",
+    "reset_layout": "🔄 Reset Layout",
+    "lang_select": "🌐 Language / Язык"
+  },
+  "tabs": {
+    "map_canvas": "🗺️ Map Canvas",
+    "script_editor": "📝 Script Editor",
+    "configurator": "⚙️ Engine Configurator",
+    "hud_editor": "📺 HUD Designer",
+    "console": "💻 Compiler Console",
+    "project_tree": "📂 Project Tree"
+  },
+  "wizard": {
+    "welcome": "Welcome to ZX Spectrum Core IDE",
+    "create_desc": "Create a new Pixel-Art game from scratch",
+    "open_desc": "Open an existing retro game project",
+    "select_platform": "Select Target Platform",
+    "next_btn": "Next ➡️",
+    "back_btn": "⬅️ Back"
+  },
+  "status": {
+    "init": "IDE initialized successfully",
+    "saved": "✅ Project successfully saved to",
+    "save_err": "❌ Project save error",
+    "c_generated": "C headers generated from templates",
+    "closed": "Project closed. IDE is ready to create or open a new file.",
+    "cache_cleared": "Z88DK build cache successfully cleared",
+    "layout_reset": "Panel layout successfully restored!",
+    "loading": "Loading project",
+    "script_opened": "📖 File successfully opened in editor"
+  }
+}

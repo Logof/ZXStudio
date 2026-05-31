@@ -15,7 +15,7 @@ use crate::core::validator::ClashError;
 use crate::models::ProjectData;
 use eframe::egui;
 use egui_dock::{DockArea, DockState, Style};
-use menu_bar::render_menu_bar;
+use menu_bar::{render_menu_bar, Language};
 use states::{CustomTab, MapEditMode, Tab, WizardStep};
 use tab_viewer::ZxTabViewer;
 use toolbar::render_toolbar;
@@ -26,7 +26,22 @@ impl ZxIdeApp {
             .storage
             .and_then(|storage| eframe::get_value(storage, "dock_state"));
 
+        // ============================================================================
+        // ВОССТАНОВЛЕНИЕ НАСТРОЕК И ИСТОРИИ ИЗ ХРАНИЛИЩА ОС
+        // ============================================================================
+        let saved_language: Language = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, "current_language"))
+            .unwrap_or(Language::Ru);
+
+        let saved_recent: Vec<String> = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, "recent_projects"))
+            .unwrap_or_else(Vec::new);
+        // ============================================================================
+
         let final_dock_state = dock_state.unwrap_or_else(Self::create_default_layout);
+        let translations = menu_bar::AppTranslations::load(saved_language);
 
         Self {
             project: ProjectData::default(),
@@ -58,8 +73,11 @@ impl ZxIdeApp {
             project_name: "my_retro_game".to_string(),
             project_path: String::new(),
 
-            // Синхронизировано с обновленным перечислением ConfigTab
             configurator_tab: crate::ui::configurator::ConfigTab::General,
+
+            current_language: saved_language,
+            recent_projects: saved_recent,
+            translations: translations,
         }
     }
 
@@ -84,6 +102,8 @@ impl ZxIdeApp {
 impl eframe::App for ZxIdeApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, "dock_state", &self.dock_state);
+        eframe::set_value(storage, "current_language", &self.current_language);
+        eframe::set_value(storage, "recent_projects", &self.recent_projects);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -183,7 +203,7 @@ impl eframe::App for ZxIdeApp {
                 });
             });
 
-        // Основное рабочее пространство DockArea
+        // 5. Основное рабочее пространство DockArea
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 17)))
             .show(ctx, |ui| {
@@ -223,6 +243,7 @@ impl eframe::App for ZxIdeApp {
                     sprites_texture: &self.sprites_texture,
                     hud_frame_texture: &self.hud_frame_texture,
                     selected_font_char_idx: &mut self.selected_font_char_idx,
+                    translations: &self.translations,
                 };
 
                 DockArea::new(&mut self.dock_state)

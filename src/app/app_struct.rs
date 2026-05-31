@@ -1,4 +1,5 @@
 use super::states::{CustomTab, MapEditMode, Tab, WizardStep};
+use crate::app::menu_bar::{AppTranslations, Language};
 use crate::core::validator::ClashError;
 use crate::models::ProjectData;
 use crate::ui::configurator::ConfigTab;
@@ -22,9 +23,6 @@ pub struct ZxIdeApp {
     pub selected_hotspot_type: u8,
 
     pub tileset_texture: Option<eframe::egui::TextureHandle>,
-    // ============================================================================
-    // НОВОЕ УЛУЧШЕНИЕ: Вектор индивидуальных 16x16 текстур тайлов для UI палитры
-    // ============================================================================
     pub sliced_tile_textures: Vec<eframe::egui::TextureHandle>,
 
     pub sprites_texture: Option<eframe::egui::TextureHandle>,
@@ -39,4 +37,7 @@ pub struct ZxIdeApp {
 
     pub configurator_tab: ConfigTab,
     pub selected_font_char_idx: usize,
+    pub current_language: Language,
+    pub recent_projects: Vec<String>,
+    pub translations: AppTranslations,
 }

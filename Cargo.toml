@@ -12,3 +12,4 @@ egui_dock = { version = "=0.10.0", features = ["serde"] }
 chrono = "0.4"
 rfd = "0.14"
 font-kit = "0.14"
+egui_extras = { version = "0.34.3", features = ["all_loaders"] }

@@ -171,35 +171,6 @@ impl EnemyAiType {
             }
         }
     }
-
-    // Служебные функции разделения категорий для рендерера холста
-    pub fn is_linear(self) -> bool {
-        matches!(
-            self,
-            Self::LinearHorizontalLeft
-                | Self::LinearHorizontalRight
-                | Self::LinearVertical
-                | Self::PlatformOrPursuer
-        )
-    }
-    pub fn is_quadrator(self) -> bool {
-        matches!(
-            self,
-            Self::QuadratorUp
-                | Self::QuadratorRight
-                | Self::QuadratorDown
-                | Self::QuadratorLeftOrLift
-        )
-    }
-    pub fn is_marruler(self) -> bool {
-        matches!(
-            self,
-            Self::MarrulerRight | Self::MarrulerLeft | Self::MarrulerUp | Self::MarrulerDown
-        )
-    }
-    pub fn is_ghost(self) -> bool {
-        matches!(self, Self::GhostRandomRespawn | Self::GhostFantyHoming)
-    }
 }
 
 /// Стандартная реализация Display использует Платформер как базовое представление

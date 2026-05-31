@@ -111,8 +111,6 @@ impl Default for ProjectData {
 
         let default_mode = TileMode::Packed16;
 
-        let mut default_font = vec![0u8; 768];
-
         Self {
             config: PhysicsConfig::default(),
             screens,

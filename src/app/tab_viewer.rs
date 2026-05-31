@@ -1,4 +1,5 @@
 // src/app/tab_viewer.rs
+use super::menu_bar::AppTranslations; // Импортируем глобальную структуру локализации
 use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
 use crate::models::ProjectData;
@@ -35,19 +36,25 @@ pub struct ZxTabViewer<'a> {
     // Позволяет сквозным образом связать состояние приложения и редактор шрифтов.
     // ============================================================================
     pub selected_font_char_idx: &'a mut usize,
+
+    // ============================================================================
+    // ГЛОБАЛЬНАЯ ЛОКАЛИЗАЦИЯ: Ссылка на активную языковую матрицу
+    // ============================================================================
+    pub translations: &'a AppTranslations,
 }
 
 impl<'a> TabViewer for ZxTabViewer<'a> {
     type Tab = CustomTab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        let loc = &self.translations.tabs;
         match tab {
-            CustomTab::ProjectTree => "📁 Проект".into(),
-            CustomTab::MapCanvas => "🗺️ NM Конструктор мира".into(),
-            CustomTab::ScriptEditor => "📜 Редактор скриптов".into(),
-            CustomTab::Configurator => "⚙️ Настройки движка".into(),
-            CustomTab::Console => "💻 Логи компиляции".into(),
-            CustomTab::HudEditor => "📺 HUD-Конструктор".into(),
+            CustomTab::ProjectTree => (&loc.project_tree).into(),
+            CustomTab::MapCanvas => (&loc.map_canvas).into(),
+            CustomTab::ScriptEditor => (&loc.script_editor).into(),
+            CustomTab::Configurator => (&loc.configurator).into(),
+            CustomTab::Console => (&loc.console).into(),
+            CustomTab::HudEditor => (&loc.hud_editor).into(),
         }
     }
 
@@ -61,6 +68,14 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
         match tab {
             // 📑 ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
             CustomTab::ProjectTree => {
+                // Вшиваем перевод текущего кадра в контекст egui
+                ui.ctx().data_mut(|d| {
+                    d.insert_temp(
+                        egui::Id::new("translations_cache"),
+                        self.translations.clone(),
+                    );
+                });
+
                 if let Some(target_tab) = render_project_tree(ui, &self.project_path) {
                     ui.ctx().data_mut(|d| {
                         d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab)
@@ -109,10 +124,14 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::Configurator => {
-                // ============================================================================
-                // ИСПРАВЛЕНО: Передаем четвертый параметр selected_font_char_idx
-                // для управления пиксельной сеткой в новой подсистеме шрифтов
-                // ============================================================================
+                // Вшиваем перевод для подмодулей конфигуратора
+                ui.ctx().data_mut(|d| {
+                    d.insert_temp(
+                        egui::Id::new("translations_cache"),
+                        self.translations.clone(),
+                    );
+                });
+
                 render_configurator(
                     ui,
                     self.project,
@@ -127,7 +146,8 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::Console => {
-                ui.heading("Логи сборки проекта");
+                // Использование строк из JSON-локализации для заголовка консоли логов сборки
+                ui.heading(&self.translations.tabs.console);
                 ui.add_space(6.0);
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
