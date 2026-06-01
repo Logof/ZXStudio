@@ -41,5 +41,18 @@
     "layout_reset": "Расположение панелей успешно восстановлено!",
     "loading": "Загрузка проекта",
     "script_opened": "📖 Файл успешно открыт в редакторе"
+  },
+  "ide_settings": {
+    "title": "🔧 Настройки среды",
+    "compiler_section": "⚙️ Путь и параметры компилятора Z88DK / Сборщика",
+    "compiler_path_label": "Корневой путь к Z88DK (директория):",
+    "compiler_path_btn": "📂 Обзор...",
+    "compiler_label": "Команда сборки (CLI):",
+    "compiler_hint": "Пример: zcc +zx -vn -make-app game.c или ./build.sh",
+    "test_btn": "⚡ Проверить вызов",
+    "save_btn": "💾 Сохранить настройки среды",
+    "status_test_start": "⏳ Запуск команды компилятора...",
+    "status_test_ok": "✅ Компилятор ответил успешно!",
+    "status_test_fail": "❌ Ошибка вызова компилятора: "
   }
 }

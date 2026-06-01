@@ -26,9 +26,6 @@ impl ZxIdeApp {
             .storage
             .and_then(|storage| eframe::get_value(storage, "dock_state"));
 
-        // ============================================================================
-        // ВОССТАНОВЛЕНИЕ НАСТРОЕК И ИСТОРИИ ИЗ ХРАНИЛИЩА ОС
-        // ============================================================================
         let saved_language: Language = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, "current_language"))
@@ -42,6 +39,18 @@ impl ZxIdeApp {
 
         let final_dock_state = dock_state.unwrap_or_else(Self::create_default_layout);
         let translations = menu_bar::AppTranslations::load(saved_language);
+        let saved_command: String = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, "compile_command"))
+            .unwrap_or_else(|| "zcc +zx -vn main.c -o game.tap".to_string());
+
+        // ДОБАВЛЕНО: Восстанавливаем сохраненный путь к Z88DK
+        let saved_z88dk_path: String = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, "z88dk_path"))
+            .unwrap_or_else(String::new);
+
+        let (compiler_tx, compiler_rx) = std::sync::mpsc::channel();
 
         Self {
             project: ProjectData::default(),
@@ -78,6 +87,11 @@ impl ZxIdeApp {
             current_language: saved_language,
             recent_projects: saved_recent,
             translations: translations,
+            compile_command: saved_command,
+            z88dk_path: saved_z88dk_path,
+            compiler_log: String::new(),
+            compiler_tx,
+            compiler_rx,
         }
     }
 
@@ -86,6 +100,7 @@ impl ZxIdeApp {
             CustomTab::MapCanvas,
             CustomTab::ScriptEditor,
             CustomTab::Configurator,
+            CustomTab::IdeSettings,
         ]);
         let surface = default_state.main_surface_mut();
         let root_node = egui_dock::NodeIndex::root();
@@ -104,6 +119,8 @@ impl eframe::App for ZxIdeApp {
         eframe::set_value(storage, "dock_state", &self.dock_state);
         eframe::set_value(storage, "current_language", &self.current_language);
         eframe::set_value(storage, "recent_projects", &self.recent_projects);
+        eframe::set_value(storage, "z88dk_path", &self.z88dk_path);
+        eframe::set_value(storage, "compile_command", &self.compile_command);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -244,11 +261,90 @@ impl eframe::App for ZxIdeApp {
                     hud_frame_texture: &self.hud_frame_texture,
                     selected_font_char_idx: &mut self.selected_font_char_idx,
                     translations: &self.translations,
+                    z88dk_path: &mut self.z88dk_path,
+                    compile_command: &mut self.compile_command,
+                    compiler_log: &mut self.compiler_log,
+                    compiler_tx: self.compiler_tx.clone(),
                 };
 
                 DockArea::new(&mut self.dock_state)
                     .style(dock_style)
                     .show_inside(ui, &mut viewer);
+
+                // Метод try_recv() мгновенно проверяет буфер канала, не блокируя поток GUI
+                while let Ok(incoming_msg) = self.compiler_rx.try_recv() {
+                    // 1. Дублируем краткую версию в нижнюю плашку status_bar
+                    self.status_message = incoming_msg.clone();
+
+                    // 2. Рассчитываем текущую системную дату и время через std::time
+                    let timestamp = if let Ok(duration) =
+                        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    {
+                        let secs = duration.as_secs();
+                        let seconds = secs % 60;
+                        let minutes = (secs / 60) % 60;
+                        let hours = (secs / 3600) % 24;
+                        format!("[{:02}:{:02}:{:02}] ", hours, minutes, seconds)
+                    } else {
+                        "[??:??:??] ".to_string()
+                    };
+
+                    // 3. Дописываем полный текст лога с таймстампом
+                    self.compiler_log
+                        .push_str(&format!("{}{}\n", timestamp, incoming_msg));
+
+                    // ============================================================================
+                    // УЛУЧШЕНИЕ: Очистка памяти. Ограничиваем буфер строго до 500 последних строк
+                    // ============================================================================
+                    let line_count = self.compiler_log.matches('\n').count();
+                    if line_count > 500 {
+                        // Ищем индекс символа '\n', который отсекает первые (лишние) строки
+                        let skip_lines = line_count - 500;
+                        if let Some((byte_idx, _)) =
+                            self.compiler_log.match_indices('\n').nth(skip_lines - 1)
+                        {
+                            // Безопасно отрезаем старый кусок текста, оставляя только свежие 500 строк
+                            self.compiler_log = self.compiler_log[byte_idx + 1..].to_string();
+                        }
+                    }
+                    // ============================================================================
+
+                    // 4. Автоматически выводим вкладку консоли на передний план док-системы
+                    if let Some(tab_coordinates) = self.dock_state.find_tab(&CustomTab::Console) {
+                        self.dock_state.set_active_tab(tab_coordinates);
+                    }
+
+                    // Форсируем мгновенную перерисовку текущего кадра
+                    ui.ctx().request_repaint();
+                }
+
+                if let Some(incoming_status) = ui.ctx().data_mut(|d| {
+                    d.remove_temp::<String>(egui::Id::new("global_compiler_status_msg"))
+                }) {
+                    // 1. Извлекаем текущий накопительный лог из памяти
+                    let mut current_log = ui
+                        .ctx()
+                        .data(|d| d.get_temp::<String>(egui::Id::new("global_compiler_log_buffer")))
+                        .unwrap_or_else(String::new);
+
+                    // 2. Формируем красивую строчку с маркером
+                    let timestamp = ">".to_string();
+                    current_log.push_str(&format!("{} {}\n", timestamp, incoming_status));
+
+                    // 3. Сохраняем обновленный многострочный массив обратно в память egui
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(egui::Id::new("global_compiler_log_buffer"), current_log);
+                    });
+
+                    // 4. Принудительно выводим вкладку консоли на передний план док-системы
+                    if let Some(tab_coordinates) = self.dock_state.find_tab(&CustomTab::Console) {
+                        self.dock_state.set_active_tab(tab_coordinates);
+                    }
+
+                    // Форсируем мгновенную перерисовку экрана
+                    ui.ctx().request_repaint();
+                }
+                // ============================================================================
 
                 if let Some(target_tab) = ui
                     .ctx()

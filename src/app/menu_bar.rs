@@ -67,11 +67,27 @@ pub struct StatusSection {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct IdeSettingsSection {
+    pub title: String,
+    pub compiler_section: String,
+    pub compiler_path_label: String, // ДОБАВЛЕНО
+    pub compiler_path_btn: String,   // ДОБАВЛЕНО
+    pub compiler_label: String,
+    pub compiler_hint: String,
+    pub test_btn: String,
+    pub save_btn: String,
+    pub status_test_start: String,
+    pub status_test_ok: String,
+    pub status_test_fail: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct AppTranslations {
     pub menu: MenuSection,
     pub tabs: TabsSection,
     pub wizard: WizardSection,
     pub status: StatusSection,
+    pub ide_settings: IdeSettingsSection,
 }
 
 impl AppTranslations {
@@ -235,12 +251,24 @@ pub fn render_menu_bar(app: &mut ZxIdeApp, ctx: &egui::Context) {
             });
 
             ui.menu_button(&loc.window, |ui| {
+                if ui.button("🔧 Настройки IDE...").clicked() {
+                    if app.dock_state.find_tab(&CustomTab::IdeSettings).is_none() {
+                        let surface = app.dock_state.main_surface_mut();
+                        surface.push_to_focused_leaf(CustomTab::IdeSettings);
+                    }
+
+                    ui.ctx().data_mut(|d| {
+                        d.insert_temp(egui::Id::new("tab_switch_signal"), CustomTab::IdeSettings);
+                    });
+                    ui.close_menu();
+                }
                 if ui.button(&loc.reset_layout).clicked() {
                     let mut default_state = egui_dock::DockState::new(vec![
                         CustomTab::MapCanvas,
                         CustomTab::ScriptEditor,
                         CustomTab::Configurator,
                         CustomTab::HudEditor,
+                        CustomTab::IdeSettings,
                     ]);
                     let surface = default_state.main_surface_mut();
                     let root_node = egui_dock::NodeIndex::root();

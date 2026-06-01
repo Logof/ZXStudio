@@ -30,4 +30,5 @@ pub enum CustomTab {
     Configurator,
     HudEditor,
     Console,
+    IdeSettings,
 }

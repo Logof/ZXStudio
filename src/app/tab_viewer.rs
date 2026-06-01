@@ -24,23 +24,20 @@ pub struct ZxTabViewer<'a> {
     pub selected_tile: &'a mut u8,
     pub script_text: &'a mut String,
     pub clash_errors: &'a [ClashError],
-    pub status_message: &'a str,
+    pub status_message: &'a str, // Оставляем без изменений, как в исходной версии
     pub map_edit_mode: &'a mut MapEditMode,
     pub selected_enemy_type: &'a mut u8,
     pub sliced_tile_textures: &'a [egui::TextureHandle],
     pub sprites_texture: &'a Option<egui::TextureHandle>,
     pub hud_frame_texture: &'a Option<egui::TextureHandle>,
-
-    // ============================================================================
-    // НОВОЕ УЛУЧШЕНИЕ: Изменяемая ссылка на индекс выбранного ASCII-символа.
-    // Позволяет сквозным образом связать состояние приложения и редактор шрифтов.
-    // ============================================================================
     pub selected_font_char_idx: &'a mut usize,
 
-    // ============================================================================
-    // ГЛОБАЛЬНАЯ ЛОКАЛИЗАЦИЯ: Ссылка на активную языковую матрицу
-    // ============================================================================
     pub translations: &'a AppTranslations,
+    pub z88dk_path: &'a mut String,
+    pub compile_command: &'a mut String,
+    pub compiler_log: &'a mut String,
+
+    pub compiler_tx: std::sync::mpsc::Sender<String>,
 }
 
 impl<'a> TabViewer for ZxTabViewer<'a> {
@@ -55,20 +52,18 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             CustomTab::Configurator => (&loc.configurator).into(),
             CustomTab::Console => (&loc.console).into(),
             CustomTab::HudEditor => (&loc.hud_editor).into(),
+            CustomTab::IdeSettings => (&self.translations.ide_settings.title).into(),
         }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        // Проверяем первый нарезанный тайл (если он есть), чтобы прокинуть в контекст
         if let Some(first_tile_tex) = self.sliced_tile_textures.first() {
             ui.ctx()
                 .data_mut(|d| d.insert_temp(egui::Id::new("tileset_tex"), first_tile_tex.clone()));
         }
 
         match tab {
-            // 📑 ДЕРЕВО ПРОЕКТА КАК САМОСТОЯТЕЛЬНАЯ ПАНЕЛЬ ДOК-СИСТЕМЫ
             CustomTab::ProjectTree => {
-                // Вшиваем перевод текущего кадра в контекст egui
                 ui.ctx().data_mut(|d| {
                     d.insert_temp(
                         egui::Id::new("translations_cache"),
@@ -83,22 +78,12 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 }
             }
 
-            // ============================================================================
-            // КОНСТРУКТОР МИРА: УНИЧТОЖАЕМ СКРОЛЛ ВКЛАДКИ ДОК-СИСТЕМЫ
-            // ============================================================================
             CustomTab::MapCanvas => {
-                // 1. Измеряем точные физические габариты окна, выделенного док-системой
                 let max_size = ui.available_size();
-
-                // 2. Рассчитываем жесткий прямоугольник (Rect) для отрисовки, начиная от текущего курсора
                 let child_rect = egui::Rect::from_min_size(ui.cursor().min, max_size);
-
-                // 3. Создаем изолированную область (Child Ui) с абсолютным позиционированием.
-                // Находясь внутри child_ui, наш редактор карт не может вызвать появление внешних скроллов!
                 let mut child_ui =
                     ui.child_ui(child_rect, egui::Layout::top_down(egui::Align::LEFT));
 
-                // ИСПРАВЛЕНО: Пробрасываем срез нарезанных текстур тайлов в редактор карт
                 crate::ui::map_editor::render_map_editor(
                     &mut child_ui,
                     self.project,
@@ -111,8 +96,6 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     self.sprites_texture,
                 );
 
-                // 4. Обманываем калькулятор размеров ScrollArea док-системы.
-                // Говорим родителю, что мы якобы вообще не заняли места, чтобы он скрыл полосы прокрутки.
                 ui.advance_cursor_after_rect(egui::Rect::from_min_size(
                     ui.cursor().min,
                     egui::Vec2::ZERO,
@@ -124,7 +107,6 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::Configurator => {
-                // Вшиваем перевод для подмодулей конфигуратора
                 ui.ctx().data_mut(|d| {
                     d.insert_temp(
                         egui::Id::new("translations_cache"),
@@ -141,24 +123,50 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::HudEditor => {
-                // Вызов декомпозированного HUD-редактора из папки
                 render_hud_editor(ui, self.project, &self.hud_frame_texture);
             }
 
             CustomTab::Console => {
-                // Использование строк из JSON-локализации для заголовка консоли логов сборки
                 ui.heading(&self.translations.tabs.console);
                 ui.add_space(6.0);
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.add(
-                        egui::TextEdit::multiline(&mut self.status_message.to_string())
-                            .font(egui::FontId::monospace(11.0))
-                            .desired_rows(15)
-                            .lock_focus(true)
-                            .desired_width(ui.available_width()),
-                    );
-                });
+                if ui.small_button("🧹 Очистить лог / Clear Log").clicked() {
+                    self.compiler_log.clear();
+                }
+                ui.add_space(4.0);
+
+                // ============================================================================
+                // ПОЛНАЯ СОВМЕСТИМОСТЬ: СВОБОДНОЕ ВЫДЕЛЕНИЕ, КОПИРОВАНИЕ И АВТОСКРОЛЛ (ФИКС)
+                // ============================================================================
+                egui::ScrollArea::vertical()
+                    .id_source("compiler_console_scroll")
+                    .stick_to_bottom(true) // Прижимает к низу, только если мы уже внизу лога
+                    .show(ui, |ui| {
+                        // Клонируем неизменяемый срез текста для безопасного отображения без возможности перезаписи
+                        let log_view = self.compiler_log.as_str();
+
+                        ui.add(
+                            egui::TextEdit::multiline(&mut log_view.to_string())
+                                .font(egui::FontId::monospace(11.0))
+                                .desired_rows(18)
+                                .desired_width(ui.available_width()),
+                        );
+                    });
+                // ============================================================================
+            }
+
+            // ============================================================================
+            // ОПТИМИЗИРОВАННАЯ ОТРИСОВКА ОКНА НАСТРОЕК КОМПИЛЯТОРА С СИГНАЛЬНОЙ СИСТЕМОЙ
+            // ============================================================================
+            CustomTab::IdeSettings => {
+                crate::ui::configurator::ide_settings::render_ide_settings(
+                    ui,
+                    self.compile_command,
+                    self.z88dk_path,
+                    self.project_path,
+                    self.translations,
+                    self.compiler_tx.clone(),
+                );
             }
         }
     }

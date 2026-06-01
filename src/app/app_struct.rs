@@ -40,4 +40,13 @@ pub struct ZxIdeApp {
     pub current_language: Language,
     pub recent_projects: Vec<String>,
     pub translations: AppTranslations,
+
+    pub z88dk_path: String,
+    pub compile_command: String,
+    pub compiler_log: String,
+
+    pub compiler_tx: std::sync::mpsc::Sender<String>,
+
+    /// Приемник сообщений (слушается в главном цикле update)
+    pub compiler_rx: std::sync::mpsc::Receiver<String>,
 }

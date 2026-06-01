@@ -2,6 +2,7 @@
 pub mod font_editor;
 pub mod general;
 pub mod hud_rendering;
+pub mod ide_settings;
 pub mod map_goals;
 pub mod mechanics_enemies;
 pub mod movement_controls;
