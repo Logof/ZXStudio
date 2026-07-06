@@ -12,9 +12,12 @@ impl WorldValidator {
         let map_h = project.config.map_goals.map_h as usize;
         let total_screens = map_w * map_h;
 
+        // Извлекаем контекст активного на данный момент уровня
+        let current_level = &project.levels[project.current_level_index];
+
         for scr_idx in 0..total_screens {
             let scr_key = format!("screen_{}", scr_idx);
-            if let Some(screen_data) = project.screens.get(&scr_key) {
+            if let Some(screen_data) = current_level.screens.get(&scr_key) {
                 Self::check_enemies(scr_idx, screen_data, project, &mut errors);
                 Self::check_hotspots(scr_idx, screen_data, project, &mut errors);
             }
@@ -29,15 +32,17 @@ impl WorldValidator {
         project: &ProjectData,
         errors: &mut Vec<ClashError>,
     ) {
+        let current_level = &project.levels[project.current_level_index];
+
         for (idx, enemy) in screen.enemies.iter().enumerate() {
             if enemy.type_id == 0 || enemy.x >= 15 || enemy.y >= 10 {
                 continue;
             }
 
             let cell_idx = (enemy.y as usize) * 15 + (enemy.x as usize);
-            if let Some(&tile_id) = screen.tiles_matrix.get(cell_idx) {
-                let beh = if (tile_id as usize) < project.tile_behaviours.len() {
-                    project.tile_behaviours[tile_id as usize]
+            if let Some(&tile_id) = screen.tiles_matrix.get(cell_idx) { 
+                let beh = if (tile_id as usize) < current_level.tile_behaviours.len() {
+                    current_level.tile_behaviours[tile_id as usize]
                 } else {
                     0
                 };
@@ -64,6 +69,7 @@ impl WorldValidator {
         project: &ProjectData,
         errors: &mut Vec<ClashError>,
     ) {
+        let current_level = &project.levels[project.current_level_index];
         let hs = &screen.hotspot;
         if hs.type_id == 0 || hs.x >= 15 || hs.y >= 10 {
             return;
@@ -71,8 +77,8 @@ impl WorldValidator {
 
         let cell_idx = (hs.y as usize) * 15 + (hs.x as usize);
         if let Some(&tile_id) = screen.tiles_matrix.get(cell_idx) {
-            let beh = if (tile_id as usize) < project.tile_behaviours.len() {
-                project.tile_behaviours[tile_id as usize]
+            let beh = if (tile_id as usize) < current_level.tile_behaviours.len() {
+                current_level.tile_behaviours[tile_id as usize]
             } else {
                 0
             };

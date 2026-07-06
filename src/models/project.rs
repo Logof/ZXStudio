@@ -39,7 +39,7 @@ impl TileMode {
         }
     }
 
-    /// Возвращает ожидаемые размеры файла tileset (work.png) в пикселях
+    /// Возвращает ожидаемые размеры файла tileset (work.png) in пикселях
     pub fn expected_dimensions(&self) -> (u32, u32) {
         match self {
             TileMode::Packed16 => (256, 48),
@@ -84,14 +84,15 @@ fn default_tile_mode() -> TileMode {
     TileMode::Packed16
 }
 
+/// Новая модель данных конкретного уровня в рамках концепции мультилевела
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ProjectData {
-    pub config: PhysicsConfig,
+pub struct LevelData {
+    pub name: String,
     pub screens: HashMap<String, ScreenData>,
     #[serde(default = "default_tile_mode")]
     pub tile_mode: TileMode,
 
-    // Хранилище ручной активации ролей спец-тайлов в движке
+    // Хранилище ручной активации ролей спец-тайлов в движке для этого уровня
     pub role_pushbox_active: bool,     // Роль для тайла 14
     pub role_lock_active: bool,        // Роль для тайла 15
     pub role_refill_active: bool,      // Роль для тайла 16
@@ -100,31 +101,101 @@ pub struct ProjectData {
     pub role_alt_bg_active: bool,      // Роль для тайла 19
 
     pub tile_behaviours: Vec<u8>,
-    #[serde(default = "default_project_font")]
-    pub font_data: Vec<u8>,
 }
 
-impl Default for ProjectData {
+impl Default for LevelData {
     fn default() -> Self {
         let mut screens = HashMap::new();
         screens.insert("screen_0".to_string(), ScreenData::default());
-
         let default_mode = TileMode::Packed16;
 
         Self {
-            config: PhysicsConfig::default(),
+            name: "Level 1".to_string(),
             screens,
             tile_mode: default_mode,
-
             role_pushbox_active: false,
             role_lock_active: false,
             role_refill_active: false,
             role_collectable_active: false,
             role_key_active: false,
             role_alt_bg_active: false,
-
             tile_behaviours: default_mode.default_behaviours(),
-            font_data: default_project_font(), // Переменная гарантированно видна компилятору!
+        }
+    }
+}
+
+fn default_levels() -> Vec<LevelData> {
+    vec![LevelData::default()]
+}
+
+/// Промежуточный десериализатор для обеспечения 100% обратной совместимости
+#[derive(Deserialize)]
+struct ProjectDataMigration {
+    config: PhysicsConfig,
+    levels: Option<Vec<LevelData>>,
+    screens: Option<HashMap<String, ScreenData>>,
+    tile_mode: Option<TileMode>,
+    role_pushbox_active: Option<bool>,
+    role_lock_active: Option<bool>,
+    role_refill_active: Option<bool>,
+    role_collectable_active: Option<bool>,
+    role_key_active: Option<bool>,
+    role_alt_bg_active: Option<bool>,
+    tile_behaviours: Option<Vec<u8>>,
+    #[serde(default = "default_project_font")]
+    font_data: Vec<u8>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct ProjectData {
+    pub config: PhysicsConfig,
+    pub levels: Vec<LevelData>,
+    pub current_level_index: usize,
+    pub font_data: Vec<u8>,
+}
+
+// Кастомная десериализация, прозрачно преобразующая старый формат в мультилевельный
+impl<'de> Deserialize<'de> for ProjectData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let migration = ProjectDataMigration::deserialize(deserializer)?;
+
+        let levels = if let Some(existing_levels) = migration.levels {
+            existing_levels
+        } else {
+            // Если массив уровней пуст, значит мы открыли файл старого формата.
+            // Бережно переносим все корневые данные в первый дефолтный уровень.
+            let mut legacy_level = LevelData::default();
+            if let Some(s) = migration.screens { legacy_level.screens = s; }
+            if let Some(m) = migration.tile_mode { legacy_level.tile_mode = m; }
+            if let Some(b) = migration.role_pushbox_active { legacy_level.role_pushbox_active = b; }
+            if let Some(b) = migration.role_lock_active { legacy_level.role_lock_active = b; }
+            if let Some(b) = migration.role_refill_active { legacy_level.role_refill_active = b; }
+            if let Some(b) = migration.role_collectable_active { legacy_level.role_collectable_active = b; }
+            if let Some(b) = migration.role_key_active { legacy_level.role_key_active = b; }
+            if let Some(b) = migration.role_alt_bg_active { legacy_level.role_alt_bg_active = b; }
+            if let Some(b) = migration.tile_behaviours { legacy_level.tile_behaviours = b; }
+            vec![legacy_level]
+        };
+
+        Ok(Self {
+            config: migration.config,
+            levels,
+            current_level_index: 0,
+            font_data: migration.font_data,
+        })
+    }
+}
+
+impl Default for ProjectData {
+    fn default() -> Self {
+        Self {
+            config: PhysicsConfig::default(),
+            levels: default_levels(),
+            current_level_index: 0,
+            font_data: default_project_font(),
         }
     }
 }

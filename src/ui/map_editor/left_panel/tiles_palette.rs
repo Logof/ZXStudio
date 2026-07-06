@@ -10,7 +10,10 @@ pub fn render(
     ui.label("Палитра тайлов (work.png):");
     ui.add_space(4.0);
 
-    let mode = project.tile_mode;
+    // ИСПРАВЛЕНО ПОД МУЛЬТИЛЕВЕЛ: Выделяем контекст комнат активного уровня
+    let active_idx = project.current_level_index;
+    let current_level = &mut project.levels[active_idx];
+    let mode = current_level.tile_mode;
 
     // Получаем общее количество тайлов, физически присутствующих в текущем файле/режиме
     let total_tiles = match mode {
@@ -83,14 +86,14 @@ pub fn render(
     });
 
     // --- УНИВЕРСАЛЬНЫЙ ИНСПЕКТОР ФИЗИЧЕСКИХ СВОЙСТВ ТАЙЛА ---
-    if (*selected_tile as usize) < project.tile_behaviours.len() {
+    if (*selected_tile as usize) < current_level.tile_behaviours.len() {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(4.0);
         ui.label(format!("🧱 Свойства тайла №{:02}:", selected_tile));
 
         let t_idx = *selected_tile as usize;
-        let mut current_beh = project.tile_behaviours[t_idx];
+        let mut current_beh = current_level.tile_behaviours[t_idx];
 
         egui::ComboBox::from_id_source("tile_physics_combo")
             .selected_text(match current_beh {
@@ -121,7 +124,7 @@ pub fn render(
                 );
             });
 
-        project.tile_behaviours[t_idx] = current_beh;
+        current_level.tile_behaviours[t_idx] = current_beh;
 
         // ИНСПЕКТОР РОЛЕЙ ДВИЖКА СТРОГО ПО LA CHURRERA MTE MK1 С УЧЕТОМ РЕЖИМА
         let current_tile = *selected_tile;
@@ -148,16 +151,16 @@ pub fn render(
 
                 match role_tile {
                     14 => {
-                        ui.checkbox(&mut project.role_pushbox_active, "📦 PLAYER_PUSH_BOXES")
+                        ui.checkbox(&mut current_level.role_pushbox_active, "📦 PLAYER_PUSH_BOXES")
                             .on_hover_text("Активировать ящик. Игрок сможет толкать этот тайл.");
                     }
                     15 => {
-                        ui.checkbox(&mut project.role_lock_active, "🔑 ACTIVATE_KEYS_AND_LOCKS")
+                        ui.checkbox(&mut current_level.role_lock_active, "🔑 ACTIVATE_KEYS_AND_LOCKS")
                             .on_hover_text("Активировать замок. Препятствие, исчезающее при касании замка ключом.");
                     }
                     16 => {
                         if is_extended {
-                            ui.checkbox(&mut project.role_refill_active, "❤️ REFILLS_WORK")
+                            ui.checkbox(&mut current_level.role_refill_active, "❤️ REFILLS_WORK")
                                 .on_hover_text("Активировать регенерацию здоровья при взятии тайла.");
                         } else {
                             ui.label("ℹ️ Настройка роли доступна в секции спец-тайлов палитры.");
@@ -165,7 +168,7 @@ pub fn render(
                     }
                     17 => {
                         if is_extended {
-                            ui.checkbox(&mut project.role_collectable_active, "🌟 ITEMS_WORK")
+                            ui.checkbox(&mut current_level.role_collectable_active, "🌟 ITEMS_WORK")
                                 .on_hover_text("Активировать сбор предметов. Тайл станет подбираемым лутом.");
                         } else {
                             ui.label("ℹ️ Настройка роли доступна в секции спец-тайлов палитры.");
@@ -173,7 +176,7 @@ pub fn render(
                     }
                     18 => {
                         if is_extended {
-                            ui.checkbox(&mut project.role_key_active, "🔑 KEYS_WORK")
+                            ui.checkbox(&mut current_level.role_key_active, "🔑 KEYS_WORK")
                                 .on_hover_text("Активировать ключи. Тайл станет ключом для дверей.");
                         } else {
                             ui.label("ℹ️ Настройка роли доступна в секции спец-тайлов палитры.");

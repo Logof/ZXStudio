@@ -4,9 +4,12 @@ use crate::models::ProjectData;
 
 /// Генерирует Си-код (массив mapa[]) для интеграции в движок La Churrera через Z88DK.
 /// Автоматически применяет 4-битное попарное сжатие ячеек, если в проекте активен экономный режим.
-pub fn build_map_source(project: &ProjectData, total_screens: u32) -> String {
+pub fn build_map_source_for_level(project: &ProjectData, level_idx: usize, total_screens: u32) -> String {
     let mut body = String::new();
-    let mode = project.tile_mode;
+    
+    // Извлекаем контекст указанного уровня
+    let current_level = &project.levels[level_idx];
+    let mode = current_level.tile_mode;
 
     body.push_str("// MTE MK1 (La Churrera) - Автоматически сгенерированная карта мира\n");
     body.push_str(&format!("// Режим тайлсета: {}\n\n", mode.name()));
@@ -27,9 +30,8 @@ pub fn build_map_source(project: &ProjectData, total_screens: u32) -> String {
         let scr_key = format!("screen_{}", i);
         body.push_str(&format!("\t// --- ЭКРАН №{} ---\n", i));
 
-        // ИСПРАВЛЕНО: переводим тип ссылки на срез &[u8].
-        // Статический массив байт теперь идеально инициализируется на этапе компиляции без вызова кучи
-        let tiles_matrix: &[u8] = match project.screens.get(&scr_key) {
+        // Переводим тип ссылки на срез &[u8] на основе данных экранов конкретного уровня
+        let tiles_matrix: &[u8] = match current_level.screens.get(&scr_key) {
             Some(screen) => &screen.tiles_matrix,
             None => {
                 static DUMMY_MATRIX: [u8; 150] = [0; 150];

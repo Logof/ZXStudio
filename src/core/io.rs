@@ -5,9 +5,8 @@ use std::path::{Path, PathBuf};
 
 // Импортируем наши декомпозированные атомарные Си-экспортеры
 use super::exporter::exporter_config::build_and_write_config_h;
-use super::exporter::exporter_enemies::build_enemies_source;
-// ИСПРАВЛЕНО: Вместо устаревшего изолированного экспортера хотспотов подключаем компилятор карты
-use super::exporter::exporter_map::build_map_source;
+use super::exporter::exporter_enemies::build_enemies_source_for_level;
+use super::exporter::exporter_map::build_map_source_for_level;
 
 pub fn save_project_json(
     project_path: &str,
@@ -40,7 +39,7 @@ pub fn export_config_h(project_path: &str, project: &ProjectData) -> Result<(), 
     build_and_write_config_h(project_path, project)
 }
 
-/// Чистый диспетчер сборки enems.h на основе вызова изолированных сущностей
+/// Чистый диспетчер сборки enems.h на основе вызова изолированных сущностей с поддержкой мультилевела
 pub fn export_enems_h(project_path: &str, project: &ProjectData) -> Result<(), std::io::Error> {
     let game_root = Path::new(project_path);
 
@@ -49,23 +48,30 @@ pub fn export_enems_h(project_path: &str, project: &ProjectData) -> Result<(), s
         fs::create_dir_all(&game_root)?;
     }
 
-    let target_path = game_root.join("dev/enems.h");
     let total_screens = project.config.map_goals.map_w * project.config.map_goals.map_h;
 
-    let mut final_source = String::new();
-    final_source.push_str("// MTE MK1 (la Churrera) v4\n// Generated автоматически из декомпозированных модулей Rust IDE\n\n");
+    // Циклически проходим по всем уровням проекта и генерируем enems0.h, enems1.h и т.д.
+    for (level_idx, _) in project.levels.iter().enumerate() {
+        let target_path = game_root.join(format!("dev/enems{}.h", level_idx));
+        let mut final_source = String::new();
+        final_source.push_str(&format!(
+            "// MTE MK1 (la Churrera) v4 - Level {}\n// Generated автоматически из декомпозированных модулей Rust IDE\n\n",
+            level_idx
+        ));
 
-    // Вызываем обновленный экспортер, который монолитно упаковывает и malotes, и hotspots в один файл enems.h
-    let enemies_code = build_enemies_source(project, total_screens);
-    final_source.push_str(&enemies_code);
+        // Вызываем обновленный экспортер для конкретного уровня
+        let enemies_code = build_enemies_source_for_level(project, level_idx, total_screens);
+        final_source.push_str(&enemies_code);
 
-    let mut file = fs::File::create(target_path)?;
-    file.write_all(final_source.as_bytes())?;
+        let mut file = fs::File::create(target_path)?;
+        file.write_all(final_source.as_bytes())?;
+    }
+
     Ok(())
 }
 
 // ============================================================================
-// НОВОЕ УЛУЧШЕНИЕ: Диспетчер автоматической сборки и 4-битной упаковки map.h
+// ИСПРАВЛЕНИЕ: Диспетчер автоматической сборки и 4-битной упаковки map0.h, map1.h...
 // ============================================================================
 pub fn export_map_h(project_path: &str, project: &ProjectData) -> Result<(), std::io::Error> {
     let game_root = Path::new(project_path);
@@ -74,15 +80,19 @@ pub fn export_map_h(project_path: &str, project: &ProjectData) -> Result<(), std
         fs::create_dir_all(&game_root)?;
     }
 
-    // Запекаем карту в штатную директорию дерева ресурсов Mojon Twins
-    let target_path = game_root.join("map/map.h");
     let total_screens = project.config.map_goals.map_w * project.config.map_goals.map_h;
 
-    // Вызываем компилятор карты с адаптивной логикой сжатия нибблов (4 бита / 8 бит)
-    let map_code = build_map_source(project, total_screens);
+    // Циклически проходим по всем уровням проекта и генерируем map0.h, map1.h и т.д.
+    for (level_idx, _) in project.levels.iter().enumerate() {
+        let target_path = game_root.join(format!("map/map{}.h", level_idx));
 
-    let mut file = fs::File::create(target_path)?;
-    file.write_all(map_code.as_bytes())?;
+        // Вызываем компилятор карты с адаптивной логикой сжатия для конкретного уровня
+        let map_code = build_map_source_for_level(project, level_idx, total_screens);
+
+        let mut file = fs::File::create(target_path)?;
+        file.write_all(map_code.as_bytes())?;
+    }
+
     Ok(())
 }
 

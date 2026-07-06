@@ -22,8 +22,11 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
             .ctx()
             .data(|d| d.get_temp(egui::Id::new("sliced_tile_textures_ctx")));
 
-        // Динамически определяем лимит ячеек в зависимости от выбранного режима тайлов (16 или 48)
-        let mode = project.tile_mode;
+        // ИСПРАВЛЕНО ПОД МУЛЬТИЛЕВЕЛ: Работаем с контекстом активного уровня
+        let active_idx = project.current_level_index;
+        let current_level = &mut project.levels[active_idx];
+        
+        let mode = current_level.tile_mode;
         let behaviours_count = mode.behaviours_count();
 
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -33,16 +36,16 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
                 .show(ui, |ui| {
                     for tile_id in 0..behaviours_count {
                         // БЕЗОПАСНОСТЬ ПАМЯТИ: Защита от выхода за границы массива поведений проекта
-                        if tile_id >= project.tile_behaviours.len() {
+                        if tile_id >= current_level.tile_behaviours.len() {
                             break;
                         }
 
-                        // Связываем логику с синхронизированным вектором поведений ядра модели
-                        let current_val = &mut project.tile_behaviours[tile_id];
+                        // Связываем логику с синхронизированным вектором поведений активного уровня
+                        let current_val = &mut current_level.tile_behaviours[tile_id];
 
                         // Группируем один элемент в вертикальный контейнер для центрирования кнопки кода снизу
                         ui.vertical(|ui| {
-                            // Верхний ряд: ID слева, ТАЙЛ справа
+                            // Upper row: ID left, TILE right
                             ui.horizontal(|ui| {
                                 // 1. Выводим ID тайла слева в формате "00 × " с моноширинным выравниванием
                                 ui.monospace(format!("{:02} ×", tile_id));
@@ -97,7 +100,7 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
                                 // Кнопка-меню в виде компактной плашки с кодом поведения [ 8 ]
                                 ui.menu_button(format!("[ {:^2} ]", current_val), |ui| {
                                     ui.strong(format!("Физика тайла #{}", tile_id));
-
+                                    
                                     let mut is_kills = (*current_val & 1) != 0;
                                     let mut mut_val = *current_val;
                                     let mut is_hides = (mut_val & 2) != 0;

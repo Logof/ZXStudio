@@ -145,7 +145,8 @@ impl eframe::App for ZxIdeApp {
             });
 
             let scr_key = format!("screen_{}", self.selected_screen);
-            if let Some(screen_data) = self.project.screens.get(&scr_key) {
+            let current_level = &self.project.levels[self.project.current_level_index];
+            if let Some(screen_data) = current_level.screens.get(&scr_key) {
                 // Если все враги на экране стёрты (TypeID == 0) — принудительно очищаем ошибки этого экрана
                 let has_active_entities = screen_data.enemies.iter().any(|e| e.type_id != 0)
                     || screen_data.hotspot.type_id != 0;
@@ -308,15 +309,15 @@ impl eframe::App for ZxIdeApp {
                         }
                     }
                     // ============================================================================
-
-                    // 4. Автоматически выводим вкладку консоли на передний план док-системы
-                    if let Some(tab_coordinates) = self.dock_state.find_tab(&CustomTab::Console) {
-                        self.dock_state.set_active_tab(tab_coordinates);
-                    }
-
-                    // Форсируем мгновенную перерисовку текущего кадра
-                    ui.ctx().request_repaint();
                 }
+
+                // 4. Автоматически выводим вкладку консоли на передний план док-системы
+                if let Some(tab_coordinates) = self.dock_state.find_tab(&CustomTab::Console) {
+                    self.dock_state.set_active_tab(tab_coordinates);
+                }
+
+                // Форсируем мгновенную перерисовку текущего кадра
+                ui.ctx().request_repaint();
 
                 if let Some(incoming_status) = ui.ctx().data_mut(|d| {
                     d.remove_temp::<String>(egui::Id::new("global_compiler_status_msg"))

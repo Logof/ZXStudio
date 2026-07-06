@@ -1,10 +1,10 @@
 // src/ui/map_editor/left_panel/enemies_palette.rs
-use crate::models::{enemy_ai::EnemyAiType, screen::ScreenData, ProjectData};
+use crate::models::{enemy_ai::EnemyAiType, ProjectData};
 use eframe::egui;
 
 pub fn render(
     ui: &mut egui::Ui,
-    project: &mut ProjectData, // Меняем на изменяемую ссылку, чтобы левая панель могла напрямую править врага!
+    project: &mut ProjectData, // Изменяемая ссылка, чтобы левая панель могла напрямую править врага!
     selected_enemy_sprite_slot: &mut u8,
     sprites_texture: &Option<egui::TextureHandle>,
     selected_screen: usize, // 🔥 Передаем индекс текущей комнаты
@@ -83,7 +83,10 @@ pub fn render(
     if let Some(target_id) = selected_enemy_id {
         let active_scr_key = format!("screen_{}", selected_screen);
 
-        if let Some(screen_data) = project.screens.get_mut(&active_scr_key) {
+        // ИСПРАВЛЕНО ПОД МУЛЬТИЛЕВЕЛ: Выделяем контекст комнат активного уровня
+        let current_level = &mut project.levels[project.current_level_index];
+
+        if let Some(screen_data) = current_level.screens.get_mut(&active_scr_key) {
             if let Some(enemy_idx) = screen_data.enemies.iter().position(|e| e.id == target_id) {
                 ui.group(|ui| {
                     ui.colored_label(

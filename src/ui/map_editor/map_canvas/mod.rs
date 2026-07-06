@@ -41,7 +41,7 @@ pub fn render_map_canvas(
 
     // Хранилище ID выделенного врага (общий ключ для холста и левой панели)
     let id_context_enemy = egui::Id::new("inspector_selected_enemy_id");
-    let mut selected_enemy_id: Option<u64> = ui.ctx().data(|d| d.get_temp(id_context_enemy));
+    let selected_enemy_id: Option<u64> = ui.ctx().data(|d| d.get_temp(id_context_enemy));
 
     ui.horizontal(|ui| {
         ui.label("🔍 Масштаб:");
@@ -51,6 +51,11 @@ pub fn render_map_canvas(
             camera.pan = egui::Vec2::ZERO;
         }
     });
+
+    // Извлекаем изменяемый контекст активного уровня один раз сверху
+    let active_idx = project.current_level_index;
+    let current_level = &mut project.levels[active_idx];
+    let mode = current_level.tile_mode;
 
     egui::Frame::canvas(ui.style()).show(ui, |ui| {
         let (rect, response) =
@@ -80,7 +85,9 @@ pub fn render_map_canvas(
         // ============================================================================
         if let Some((scr_idx, cell_x, cell_y)) = virtual_cell_pos {
             let scr_key = format!("screen_{}", scr_idx);
-            let screen_data = project
+            
+            // Запрашиваем экран из изолированной мапы экранов активного уровня
+            let screen_data = current_level
                 .screens
                 .entry(scr_key.clone())
                 .or_insert_with(ScreenData::default);
@@ -126,7 +133,7 @@ pub fn render_map_canvas(
                                 cell_x,
                                 cell_y,
                                 *selected_tile,
-                                project.tile_mode,
+                                mode,
                             );
                         }
                     }
@@ -137,7 +144,7 @@ pub fn render_map_canvas(
                             .iter()
                             .position(|e| e.type_id != 0 && e.x == cell_x && e.y == cell_y);
 
-                        // ИСПРАВЛЕНО: Новый враг создается ТОЛЬКО по одиночному клику (не драгу!),
+                        // Новый враг создается ТОЛЬКО по одиночному клику (не драгу!),
                         // и только если ячейка абсолютно свободна. Это исключает дублирование при Drag&Drop.
                         if is_primary_click && existing_enemy_idx.is_none() {
                             let id_ai = egui::Id::new("default_enemy_ai_type_ctx");
@@ -230,7 +237,7 @@ pub fn render_map_canvas(
                                     .data_mut(|d| d.remove_temp::<u64>(id_context_enemy));
                             } else {
                                 // 2. Если врага в ячейке нет — стираем тайл карты (зануляем в ID 0)
-                                screen_data.set_tile_and_sync(cell_x, cell_y, 0, project.tile_mode);
+                                screen_data.set_tile_and_sync(cell_x, cell_y, 0, mode);
                             }
                         }
                     }
@@ -239,7 +246,7 @@ pub fn render_map_canvas(
         }
 
         // ============================================================================
-        // ОТРИСОВКА ВСЕХ СЛОЕВ КАРТЫ МИРА
+        // ОТРИСОВКА ВСЕХ СЛОЕВ КАРТЫ МИРА В КОНТЕКСТЕ ТЕКУЩЕГО УРОВНЯ
         // ============================================================================
         for scr_row in 0..map_h {
             for scr_col in 0..map_w {
@@ -261,7 +268,7 @@ pub fn render_map_canvas(
                 }
 
                 let scr_key = format!("screen_{}", current_scr_idx);
-                let mut screen_data = project
+                let mut screen_data = current_level
                     .screens
                     .get(&scr_key)
                     .cloned()
@@ -329,7 +336,8 @@ pub fn render_map_canvas(
                     }
                 }
 
-                project.screens.insert(scr_key, screen_data);
+                // Возвращаем измененный экран обратно в хэшмапу активного уровня
+                current_level.screens.insert(scr_key, screen_data);
 
                 if current_scr_idx == *selected_screen {
                     entity_layer::render_clash_errors(

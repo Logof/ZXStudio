@@ -1,6 +1,6 @@
 // src/ui/configurator/general.rs
 use crate::app::menu_bar::AppTranslations; // Импортируем нашу глобальную локализацию
-use crate::models::project::TileMode; // Импортируем перечисление режимов
+use crate::models::project::{TileMode, LevelData}; // Импортируем перечисление режимов и структуру уровня
 use crate::models::ProjectData;
 use eframe::egui;
 
@@ -14,6 +14,11 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
     let is_english = translations.menu.lang_select.contains("Language");
 
     // ЛОКАЛИЗАЦИОННЫЕ МАРКЕРЫ СТРОК
+    let t_levels_title = if is_english { "🎛️ Project Levels Management" } else { "🎛️ Управление уровнями проекта" };
+    let t_add_level = if is_english { "➕ Add Level" } else { "➕ Добавить уровень" };
+    let t_del_level = if is_english { "❌ Delete Current" } else { "❌ Удалить текущий" };
+    let t_level_label = if is_english { "Active Level:" } else { "Активный уровень:" };
+
     let t_platform = if is_english {
         "💾 Platform, Memory & Global Properties"
     } else {
@@ -70,6 +75,79 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
         "MIN_FAPS_PER_FRAME (Ограничитель FPS: 1=50fps, 2=25fps)"
     };
 
+    // ============================================================================
+    // НОВОЕ УЛУЧШЕНИЕ: Блок мультилевельного управления (Level Selector)
+    // ============================================================================
+    ui.strong(t_levels_title);
+    ui.add_space(6.0);
+
+    ui.horizontal(|ui| {
+        ui.label(t_level_label);
+        
+        let mut selected = project.current_level_index;
+        egui::ComboBox::from_id_source("multilevel_selector")
+            .selected_text(format!("[{}] {}", selected + 1, project.levels[selected].name))
+            .show_ui(ui, |ui| {
+                for i in 0..project.levels.len() {
+                    ui.selectable_value(&mut selected, i, format!("[{}] {}", i + 1, project.levels[i].name));
+                }
+            });
+
+        if selected != project.current_level_index {
+            project.current_level_index = selected;
+            // Шлем триггеры на горячую перезагрузку графического контекста под TileMode нового уровня
+            ui.ctx().data_mut(|d| {
+                d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
+                d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
+            });
+        }
+
+        // Поле быстрого переименования имени уровня в ОЗУ
+        ui.add_space(10.0);
+        ui.text_edit_singleline(&mut project.levels[project.current_level_index].name);
+    });
+
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        if ui.button(t_add_level).clicked() {
+            let mut new_lvl = LevelData::default();
+            new_lvl.name = format!("Level {}", project.levels.len() + 1);
+            
+            // Наследуем размеры сетки комнат для нового уровня из общих целей
+            let total_screens = project.config.map_goals.map_w * project.config.map_goals.map_h;
+            new_lvl.screens.clear();
+            for i in 0..total_screens {
+                new_lvl.screens.insert(format!("screen_{}", i), crate::models::ScreenData::default());
+            }
+            
+            project.levels.push(new_lvl);
+            project.current_level_index = project.levels.len() - 1;
+            
+            ui.ctx().data_mut(|d| {
+                d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
+                d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
+            });
+        }
+
+        // Кнопка удаления с защитой: нельзя удалить единственный уровень в игре
+        ui.add_enabled_ui(project.levels.len() > 1, |ui| {
+            if ui.button(t_del_level).clicked() {
+                project.levels.remove(project.current_level_index);
+                project.current_level_index = 0;
+                
+                ui.ctx().data_mut(|d| {
+                    d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
+                    d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
+                });
+            }
+        });
+    });
+
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(6.0);
+
+    // Вектор настроек платформы
     ui.strong(t_platform);
     ui.add_space(6.0);
 
@@ -84,36 +162,40 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
     ui.add_space(6.0);
 
     // ============================================================================
-    // КРИТИЧЕСКИЙ ФИКС: Возвращаем выбор архитектуры графики (TileMode)
+    // ИСПРАВЛЕНИЕ: Выбор архитектуры графики (TileMode) теперь привязан к уровню
     // ============================================================================
     ui.horizontal(|ui| {
         ui.label(t_arch);
 
-        // Сохраняем старый режим, чтобы отследить момент изменения
-        let old_mode = project.tile_mode;
+        let active_idx = project.current_level_index;
+        let old_mode = project.levels[active_idx].tile_mode;
 
         egui::ComboBox::from_id_source("config_tile_mode_selector")
-            .selected_text(project.tile_mode.name())
+            .selected_text(project.levels[active_idx].tile_mode.name())
             .show_ui(ui, |ui| {
                 ui.selectable_value(
-                    &mut project.tile_mode,
+                    &mut project.levels[active_idx].tile_mode,
                     TileMode::Packed16,
                     TileMode::Packed16.name(),
                 );
                 ui.selectable_value(
-                    &mut project.tile_mode,
+                    &mut project.levels[active_idx].tile_mode,
                     TileMode::Packed16WithShadows,
                     TileMode::Packed16WithShadows.name(),
                 );
                 ui.selectable_value(
-                    &mut project.tile_mode,
+                    &mut project.levels[active_idx].tile_mode,
                     TileMode::Extended48,
                     TileMode::Extended48.name(),
                 );
             });
 
-        // Если пользователь переключил режим — шлем триггеры в asset_loader для горячей перезагрузки PNG
-        if project.tile_mode != old_mode {
+        // Если пользователь переключил режим уровня — шлем триггеры для горячей перезагрузки PNG
+        if project.levels[active_idx].tile_mode != old_mode {
+            // Синхронизируем размер массива поведений под новый выбранный режим
+            let new_mode = project.levels[active_idx].tile_mode;
+            project.levels[active_idx].tile_behaviours = new_mode.default_behaviours();
+
             ui.ctx().data_mut(|d| {
                 d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
                 d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
@@ -122,7 +204,7 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
     });
     // ============================================================================
 
-    // Информационная сводка лимитов памяти под выбранный режим
+    // Информационная сводка лимитов памяти под выбранный режим активного уровня
     ui.add_space(6.0);
     egui::Frame::none()
         .fill(ui.visuals().faint_bg_color)
@@ -133,8 +215,9 @@ pub fn render(ui: &mut egui::Ui, project: &mut ProjectData) {
             let map_h = project.config.map_goals.map_h as usize;
             let total_screens = map_w * map_h;
             let screen_size_bytes = 15 * 10; // Размер одного экрана в тайлах
+            let active_idx = project.current_level_index;
 
-            let total_map_bytes = match project.tile_mode {
+            let total_map_bytes = match project.levels[active_idx].tile_mode {
                 TileMode::Packed16 | TileMode::Packed16WithShadows => {
                     (total_screens * screen_size_bytes + 1) / 2
                 }

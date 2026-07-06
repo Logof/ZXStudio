@@ -38,7 +38,8 @@ pub fn render(
 
         // Инспектор врагов комнаты (Строго 3 слота для структуры памяти MTE MK1 v5.0)
         let scr_key = format!("screen_{}", selected_screen);
-        if let Some(screen_data) = project.screens.get_mut(&scr_key) {
+        let active_level = &mut project.levels[project.current_level_index];
+        if let Some(screen_data) = active_level.screens.get_mut(&scr_key) {
             if !screen_data.enemies.is_empty() && *map_edit_mode == MapEditMode::Enemies {
                 ui.add_space(6.0);
 

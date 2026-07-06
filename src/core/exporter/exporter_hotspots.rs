@@ -1,9 +1,13 @@
+// src/core/exporter/exporter_hotspots.rs
 use crate::models::ProjectData;
 
-/// Сборка Си-кода массива hotspots с байтовым сжатием координат XY
-pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> String {
+/// Сборка Си-кода массива hotspots с байтовым сжатием координат XY для конкретного уровня
+pub fn build_hotspots_source_for_level(project: &ProjectData, level_idx: usize, total_screens: u32) -> String {
     let mut n_hotspots_type = vec![0; 8]; // Индексы 0..7 под типы хотспотов
     let mut body = String::new();
+
+    // Извлекаем контекст указанного уровня
+    let current_level = &project.levels[level_idx];
 
     body.push_str("typedef struct {\n\tunsigned char xy, tipo, act;\n} HOTSPOT;\n\n");
     body.push_str("HOTSPOT hotspots [] = {\n");
@@ -11,7 +15,7 @@ pub fn build_hotspots_source(project: &ProjectData, total_screens: u32) -> Strin
     for i in 0..total_screens {
         let scr_key = format!("screen_{}", i);
 
-        if let Some(screen) = project.screens.get(&scr_key) {
+        if let Some(screen) = current_level.screens.get(&scr_key) {
             if screen.hotspot.type_id > 0 {
                 // Формула сжатия Mojon Twins: xy = (y * 16) + x
                 let compressed_xy = (screen.hotspot.y * 16) + screen.hotspot.x;

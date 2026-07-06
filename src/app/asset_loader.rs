@@ -43,8 +43,8 @@ pub fn process_asset_loading(app: &mut ZxIdeApp, ctx: &egui::Context) {
     // Собираем базовый путь
     let gfx_dir = std::path::Path::new(&app.project_path).join("gfx");
 
-    // Вычисляем ожидаемые параметры под текущий режим
-    let current_mode = app.project.tile_mode;
+    // Вычисляем ожидаемые параметры под текущий режим активного уровня
+    let current_mode = app.project.levels[app.project.current_level_index].tile_mode;
     let expected_tiles_count = match current_mode {
         crate::models::project::TileMode::Packed16 => 20,
         crate::models::project::TileMode::Packed16WithShadows => 32, // Ровно 32 тайла (16 основных + 12 теней + 4 спец)

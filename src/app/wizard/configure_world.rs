@@ -27,7 +27,7 @@ pub fn render(ui: &mut egui::Ui, app: &mut ZxIdeApp) {
         TileMode::Extended48,
     ];
     for mode in &modes {
-        ui.radio_value(&mut app.project.tile_mode, *mode, mode.name());
+        ui.radio_value(&mut app.project.levels[0].tile_mode, *mode, mode.name());
     }
 
     ui.add_space(10.0);
@@ -39,9 +39,9 @@ pub fn render(ui: &mut egui::Ui, app: &mut ZxIdeApp) {
         .inner_margin(8.0)
         .show(ui, |ui| {
             ui.strong("Описание режима:");
-            ui.label(app.project.tile_mode.description());
+            ui.label(app.project.levels[0].tile_mode.description());
             ui.add_space(4.0);
-            let (w, h) = app.project.tile_mode.expected_dimensions();
+            let (w, h) = app.project.levels[0].tile_mode.expected_dimensions();
             ui.colored_label(
                 ui.visuals().weak_text_color(),
                 format!(
@@ -59,15 +59,16 @@ pub fn render(ui: &mut egui::Ui, app: &mut ZxIdeApp) {
         }
 
         if ui.button("🚀 Создать проект!").clicked() {
-            // 1. Синхронизируем размер и дефолтные значения массива поведений под выбранный режим тайлов
-            app.project.tile_behaviours = app.project.tile_mode.default_behaviours();
+            // 1. Синхронизируем размер и дефолтные значения массива поведений под выбранный режим тайлов первого уровня
+            let current_mode = app.project.levels[0].tile_mode;
+            app.project.levels[0].tile_behaviours = current_mode.default_behaviours();
 
-            // 2. Инициализируем пустую сетку комнат в памяти приложения на основе размеров мира
+            // 2. Инициализируем пустую сетку комнат в памяти приложения на основе размеров мира для первого уровня
             let total_screens =
                 app.project.config.map_goals.map_w * app.project.config.map_goals.map_h;
-            app.project.screens.clear();
+            app.project.levels[0].screens.clear();
             for i in 0..total_screens {
-                app.project.screens.insert(
+                app.project.levels[0].screens.insert(
                     format!("screen_{}", i),
                     crate::models::ScreenData::default(),
                 );

@@ -1,10 +1,13 @@
 // src/core/exporter/exporter_enemies.rs
 use crate::models::ProjectData;
 
-/// Сборка Си-кода массива malotes, дефайнов количества врагов и массива hotspots
-pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String {
+/// Сборка Си-кода массива malotes, дефайнов количества врагов и массива hotspots для конкретного уровня
+pub fn build_enemies_source_for_level(project: &ProjectData, level_idx: usize, total_screens: u32) -> String {
     let mut n_enems_type = vec![0; 15]; // Индексы 0..14 под типы ИИ врагов
     let mut body = String::new();
+
+    // Извлекаем контекст указанного уровня
+    let current_level = &project.levels[level_idx];
 
     // Си-структура MALOTE под жесткий стандарт разметки памяти Mojon Twins
     body.push_str("typedef struct {\n");
@@ -22,8 +25,8 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
         let scr_key = format!("screen_{}", i);
         body.push_str(&format!("\t// Screen {}\n", i));
 
-        // Получаем врагов текущей комнаты, либо берем пустой вектор
-        let mut screen_enemies = match project.screens.get(&scr_key) {
+        // Получаем врагов текущей комнаты выбранного уровня, либо берем пустой вектор
+        let mut screen_enemies = match current_level.screens.get(&scr_key) {
             Some(screen) => screen.enemies.clone(),
             None => Vec::new(),
         };
@@ -131,7 +134,7 @@ pub fn build_enemies_source(project: &ProjectData, total_screens: u32) -> String
         let scr_key = format!("screen_{}", i);
         body.push_str(&format!("\t// Screen {}\n", i));
 
-        let (x, y, t) = match project.screens.get(&scr_key) {
+        let (x, y, t) = match current_level.screens.get(&scr_key) {
             Some(screen) => (screen.hotspot.x, screen.hotspot.y, screen.hotspot.type_id),
             None => (0, 0, 0),
         };
