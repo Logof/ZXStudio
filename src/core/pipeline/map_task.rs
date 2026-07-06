@@ -24,43 +24,55 @@ pub fn export_map_data(
     }
 
     let total_screens = map_w * map_h;
-    let mut total_processed_screens = 0;
+    let is_multilevel = project.levels.len() > 1;
 
-    // Создаем выходную директорию dev/, если её ещё нет на диске
-    if !ctx.output_dev_path.exists() {
-        std::fs::create_dir_all(&ctx.output_dev_path)?;
+    // Создаем выходную директорию map/, если её ещё нет на диске
+    let map_dir = ctx.project_path.join("map");
+    if !map_dir.exists() {
+        std::fs::create_dir_all(&map_dir)?;
     }
 
-    // ИСПРАВЛЕНИЕ ПОД МУЛЬТИЛЕВЕЛ: Циклически выжигаем файлы map0.h, map1.h и т.д. для каждого уровня
+    let mut total_processed_screens = 0;
+
+    // Циклически проходим по уровням
     for (level_idx, level_data) in project.levels.iter().enumerate() {
+        // Если это не мультилевел-проект, и мы зашли на итерацию выше 0 — выходим
+        if !is_multilevel && level_idx > 0 {
+            break;
+        }
+
         let mut map_cpp_code = String::new();
 
-        // Формируем заголовок Си-файла в стандартах Mojon Twins с указанием индекса и имени уровня
-        map_cpp_code.push_str(&format!(
-            "// MTE MK1 (La Churrera) - Автоматически сгенерированная карта комнат (Уровень {}: {})\n",
-            level_idx, level_data.name
-        ));
-        map_cpp_code
-            .push_str("// ВНИМАНИЕ: Файл создан автоматически в IDE, ручные правки будут стёрты.\n\n");
+        // Формируем заголовок Си-файла в зависимости от режима
+        if is_multilevel {
+            map_cpp_code.push_str(&format!(
+                "// MTE MK1 (La Churrera) - Карта комнат (Уровень {}: {})\n",
+                level_idx, level_data.name
+            ));
+        } else {
+            map_cpp_code.push_str("// MTE MK1 (La Churrera) - Классическая монолитная карта мира\n");
+        }
+        map_cpp_code.push_str("// ВНИМАНИЕ: Файл создан автоматически в IDE, ручные правки будут стёрты.\n\n");
 
         map_cpp_code.push_str(&format!("#define MAP_W {}\n", map_w));
         map_cpp_code.push_str(&format!("#define MAP_H {}\n", map_h));
         map_cpp_code.push_str(&format!("#define TOTAL_SCREENS {}\n\n", total_screens));
 
-        // Модифицируем имя массива, чтобы churromain.c мог адресовать нужный указатель по номеру уровня
-        map_cpp_code.push_str(&format!("unsigned char mapa_level_{} [] = {{\n", level_idx));
+        // Выбираем имя массива в зависимости от флага мультилевела
+        if is_multilevel {
+            map_cpp_code.push_str(&format!("unsigned char mapa_level_{} [] = {{\n", level_idx));
+        } else {
+            map_cpp_code.push_str("unsigned char mapa [] = {\n");
+        }
 
-        // Последовательно перебираем все экраны по индексам сетки текущего уровня (0..total_screens)
+        // Перебираем все экраны по индексам сетки текущего уровня (0..total_screens)
         for scr_idx in 0..total_screens {
             let scr_key = format!("screen_{}", scr_idx);
-
-            // Если экрана нет в хэшмапе данного уровня, берем пустой по умолчанию
             let default_screen = ScreenData::default();
             let screen_data = level_data.screens.get(&scr_key).unwrap_or(&default_screen);
 
             map_cpp_code.push_str(&format!("\t// --- ЭКРАН {} ---\n\t", scr_idx));
 
-            // Выгружаем 150 байт матрицы (15x10)
             for y in 0..10 {
                 for x in 0..15 {
                     let idx = y * 15 + x;
@@ -72,32 +84,33 @@ pub fn export_map_data(
 
                     map_cpp_code.push_str(&format!("{}, ", tile_id));
                 }
-                // Форматируем строки по 15 тайлов для удобного чтения программистом
                 if y < 9 {
                     map_cpp_code.push_str("\n\t");
                 }
             }
-
             map_cpp_code.push_str("\n\n");
             total_processed_screens += 1;
         }
 
-        // Закрываем Си-массив
         map_cpp_code.push_str("};\n");
 
-        // Формируем уникальный путь назначения: /dev/map{level_idx}.h
-        let output_file_path = ctx.output_dev_path.join(format!("map{}.h", level_idx));
+        // Определяем имя выходного файла на диске
+        let output_file_path = if is_multilevel {
+            map_dir.join(format!("map{}.h", level_idx))
+        } else {
+            map_dir.join("map.h")
+        };
 
-        // Записываем файл на диск
         let mut file = File::create(&output_file_path)?;
         file.write_all(map_cpp_code.as_bytes())?;
     }
 
-    Ok(TaskStatus::Success(format!(
-        "Сгенерированы Си-заголовки dev/map[0..{}].h. Успешно упаковано {} уровней (всего {} экранов, {} байт).",
-        project.levels.len() - 1,
-        project.levels.len(),
-        total_processed_screens,
-        total_processed_screens * 150
-    )))
+    if is_multilevel {
+        Ok(TaskStatus::Success(format!(
+            "Сгенерированы Си-заголовки map[0..{}].h (Мультилевел-режим).",
+            project.levels.len() - 1
+        )))
+    } else {
+        Ok(TaskStatus::Success("Сгенерирован классический монолитный Си-заголовок 'map/map.h'.".to_string()))
+    }
 }
