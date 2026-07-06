@@ -1,5 +1,5 @@
 // src/app/tab_viewer.rs
-use super::menu_bar::AppTranslations; // Импортируем глобальную структуру локализации
+use super::menu_bar::AppTranslations; // ... Импортируем глобальную структуру локализации
 use super::states::{CustomTab, MapEditMode};
 use crate::core::validator::ClashError;
 use crate::models::ProjectData;
@@ -71,7 +71,8 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     );
                 });
 
-                if let Some(target_tab) = render_project_tree(ui, &self.project_path) {
+                // ФИКС СИГНАТУРЫ: Передаем изменяемую ссылку на project для отрисовки виртуальных нод ОЗУ
+                if let Some(target_tab) = render_project_tree(ui, &self.project_path, self.project) {
                     ui.ctx().data_mut(|d| {
                         d.insert_temp(egui::Id::new("tab_switch_signal"), target_tab)
                     });
@@ -79,6 +80,21 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::MapCanvas => {
+                // --------------------------------------------------------------------
+                // ВЕЛИКОЕ УЛУЧШЕНИЕ GUI: Выводим интерактивный бейдж активного уровня
+                // --------------------------------------------------------------------
+                let active_idx = self.project.current_level_index;
+                let level_name = &self.project.levels[active_idx].name;
+                
+                ui.horizontal(|ui| {
+                    ui.add_space(8.0);
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0, 255, 255),
+                        format!("▶ ТЕКУЩИЙ УРОВЕНЬ: [{}] {}", active_idx + 1, level_name)
+                    );
+                });
+                ui.add_space(4.0);
+
                 let max_size = ui.available_size();
                 let child_rect = egui::Rect::from_min_size(ui.cursor().min, max_size);
                 let mut child_ui =

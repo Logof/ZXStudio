@@ -111,27 +111,6 @@ impl CanvasCamera {
         is_pan_drag
     }
 
-    /// Центрирует камеру на указанном экране матрицы относительно текущего Rect холста
-    pub fn center_on_screen(
-        &mut self,
-        scr_idx: usize,
-        map_w: usize,
-        scr_w: f32,
-        scr_h: f32,
-        canvas_rect: egui::Rect,
-    ) {
-        let scr_col = scr_idx % map_w;
-        let scr_row = scr_idx / map_w;
-
-        // Вычисляем мировые координаты центра целевого экрана
-        let target_world_center_x = (scr_col as f32 * scr_w) + (scr_w / 2.0);
-        let target_world_center_y = (scr_row as f32 * scr_h) + (scr_h / 2.0);
-
-        // Рассчитываем смещение (pan), чтобы мировой центр встал ровно по центру физического Rect
-        self.pan.x = (canvas_rect.width() / 2.0) - (target_world_center_x * self.zoom);
-        self.pan.y = (canvas_rect.height() / 2.0) - (target_world_center_y * self.zoom);
-    }
-
     pub fn to_virtual_cell(
         &self,
         mouse_pos: egui::Pos2,

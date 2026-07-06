@@ -192,7 +192,7 @@ impl eframe::App for ZxIdeApp {
         if self.wizard_active {
             egui::CentralPanel::default()
                 .frame(egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 17)))
-                .show(ctx, |ui| {
+                .show(ctx, |_ui| {
                     self.render_project_wizard(ctx);
                 });
             return;

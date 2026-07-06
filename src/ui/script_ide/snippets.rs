@@ -24,6 +24,26 @@ pub fn render(ui: &mut egui::Ui, script_text: &mut String, selected_screen: usiz
                         .max_height(ui.available_height() - 10.0)
                         .show(ui, |ui| {
                             
+                            // ============================================================================
+                            // НОВОЕ УЛУЧШЕНИЕ: Секция макрокоманд Мультилевела (Глава 12)
+                            // ============================================================================
+                            ui.colored_label(egui::Color32::from_rgb(255, 180, 0), "🗺️ Мультилевел (Кампании):");
+                            ui.add_space(2.0);
+
+                            if ui.add_sized(btn_size, egui::Button::new("LEVEL x (Секция)")).clicked() {
+                                script_text.push_str("\n\nLEVEL 0\nBEGIN\nEND");
+                            }
+                            if ui.add_sized(btn_size, egui::Button::new("IF LEVEL = n (Условие)")).clicked() {
+                                script_text.push_str("\n\tIF LEVEL = 0\n\tTHEN\n\t\t\n\tEND");
+                            }
+                            if ui.add_sized(btn_size, egui::Button::new("NEXT_LEVEL (Команда)")).clicked() {
+                                script_text.push_str("\n\t\tNEXT_LEVEL");
+                            }
+
+                            ui.add_space(6.0);
+                            ui.separator();
+                            ui.add_space(4.0);
+
                             ui.colored_label(egui::Color32::from_rgb(0, 255, 255), "🎯 Разделы (Secciones):");
                             ui.add_space(2.0);
 

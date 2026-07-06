@@ -1,5 +1,5 @@
 // src/core/png2scr.rs
-use image::{GenericImageView, Pixel, RgbaImage};
+use image::{Pixel};
 use std::fs::File;
 use std::io::{Result, Write};
 use std::path::Path;

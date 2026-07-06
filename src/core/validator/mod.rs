@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 // ИСПРАВЛЕНО: Реэкспортируем функцию под старым именем для обратной совместимости
 // ============================================================================
 pub use attribute_clash::validate_image_colors as validate_attribute_clash;
-pub use world_collisions::WorldValidator;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ErrorSeverity {
