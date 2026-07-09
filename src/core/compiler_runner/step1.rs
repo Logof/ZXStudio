@@ -128,7 +128,7 @@ fn compile_single_block_to_c(dev_dir: &Path, file_name: &str, text: &str, log_tx
         }
     };
 
-    if file.write_all(h_code.as_bytes()).is_his_err() { return false; }
+    if file.write_all(h_code.as_bytes()).is_err() { return false; }
     let _ = log_tx.send(format!("   -> Нативно сгенерирован заголовок dev/{} ({} байт кодов).", file_name, byte_count));
     true
 }

@@ -9,8 +9,26 @@ pub enum TileMode {
     Packed16,
     /// Экономный режим с автоматическим расчетом и отображением теней.
     Packed16WithShadows,
-    /// Расширенный режим: 48 тайлов (8 бит), спец-тайлы жестко вшиты в индексы.
+    /// Расширенный режим: 48 тайлов (8 бит), спец-тайлы жестко вшиты in индексы.
     Extended48,
+}
+
+/// Алгоритмы сжатия данных, поддерживаемые в MTE MK1 v4.8 "Zombie"
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompressionMode {
+    Appack,
+    Zx7,
+    Zx0,
+}
+
+impl CompressionMode {
+    pub fn name(&self) -> &'static str {
+        match self {
+            CompressionMode::Appack => "Appack (Стандартный)",
+            CompressionMode::Zx7 => "ZX7 (Эффективный)",
+            CompressionMode::Zx0 => "ZX0 (Максимальное сжатие)",
+        }
+    }
 }
 
 impl TileMode {
@@ -39,7 +57,7 @@ impl TileMode {
         }
     }
 
-    /// Возвращает ожидаемые размеры файла tileset (work.png) in пикселях
+    /// Возвращает ожидаемые размеры файла tileset (work.png) в пикселях
     pub fn expected_dimensions(&self) -> (u32, u32) {
         match self {
             TileMode::Packed16 => (256, 48),
@@ -79,9 +97,13 @@ impl TileMode {
     }
 }
 
-/// Вспомогательная функция для автоматического восстановления старых JSON сохранений
+/// Вспомогательные функции для автоматического восстановления старых JSON сохранений
 fn default_tile_mode() -> TileMode {
     TileMode::Packed16
+}
+
+fn default_compression_mode() -> CompressionMode {
+    CompressionMode::Appack
 }
 
 /// Новая модель данных конкретного уровня в рамках концепции мультилевела
@@ -144,7 +166,17 @@ struct ProjectDataMigration {
     tile_behaviours: Option<Vec<u8>>,
     #[serde(default = "default_project_font")]
     font_data: Vec<u8>,
+    
+    // Новые миграционные поля для ветки MK1v4
+    #[serde(default = "default_compression_mode")]
+    pub compression_mode: CompressionMode,
+    #[serde(default = "serde_default_true")]
+    pub asm_render_sprites: bool,
+    #[serde(default = "serde_default_true")]
+    pub asm_collision_detect: bool,
 }
+
+fn serde_default_true() -> bool { true }
 
 #[derive(Serialize, Clone)]
 pub struct ProjectData {
@@ -152,6 +184,11 @@ pub struct ProjectData {
     pub levels: Vec<LevelData>,
     pub current_level_index: usize,
     pub font_data: Vec<u8>,
+    
+    // Специфичные настройки ядра компиляции и оптимизации MK1v4
+    pub compression_mode: CompressionMode,
+    pub asm_render_sprites: bool,
+    pub asm_collision_detect: bool,
 }
 
 // Кастомная десериализация, прозрачно преобразующая старый формат в мультилевельный
@@ -185,6 +222,9 @@ impl<'de> Deserialize<'de> for ProjectData {
             levels,
             current_level_index: 0,
             font_data: migration.font_data,
+            compression_mode: migration.compression_mode,
+            asm_render_sprites: migration.asm_render_sprites,
+            asm_collision_detect: migration.asm_collision_detect,
         })
     }
 }
@@ -196,6 +236,9 @@ impl Default for ProjectData {
             levels: default_levels(),
             current_level_index: 0,
             font_data: default_project_font(),
+            compression_mode: CompressionMode::Appack,
+            asm_render_sprites: true,
+            asm_collision_detect: true,
         }
     }
 }

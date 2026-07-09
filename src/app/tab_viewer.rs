@@ -143,32 +143,38 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
             }
 
             CustomTab::Console => {
-                ui.heading(&self.translations.tabs.console);
-                ui.add_space(6.0);
-
-                if ui.small_button("🧹 Очистить лог / Clear Log").clicked() {
-                    self.compiler_log.clear();
-                }
-                ui.add_space(4.0);
-
-                // ============================================================================
-                // ПОЛНАЯ СОВМЕСТИМОСТЬ: СВОБОДНОЕ ВЫДЕЛЕНИЕ, КОПИРОВАНИЕ И АВТОСКРОЛЛ (ФИКС)
-                // ============================================================================
-                egui::ScrollArea::vertical()
-                    .id_source("compiler_console_scroll")
-                    .stick_to_bottom(true) // Прижимает к низу, только если мы уже внизу лога
-                    .show(ui, |ui| {
-                        // Клонируем неизменяемый срез текста для безопасного отображения без возможности перезаписи
-                        let log_view = self.compiler_log.as_str();
-
-                        ui.add(
-                            egui::TextEdit::multiline(&mut log_view.to_string())
-                                .font(egui::FontId::monospace(11.0))
-                                .desired_rows(18)
-                                .desired_width(ui.available_width()),
-                        );
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.heading(&self.translations.tabs.console);
+                        
+                        // Добавим сервисную кнопку быстрой ручной очистки логов
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("🗑 Очистить").clicked() {
+                                self.compiler_log.clear();
+                            }
+                        });
                     });
-                // ============================================================================
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    // Скролл-зона для вывода логов в реальном времени с автопрокруткой вниз
+                    egui::ScrollArea::vertical()
+                        .id_source("compiler_live_console_scroll")
+                        .max_width(ui.available_width())
+                        .stick_to_bottom(true) // Принудительно держит фокус на свежих строках логов!
+                        .show(ui, |ui| {
+                            if self.compiler_log.is_empty() {
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(120, 120, 130),
+                                    "   Консоль пуста. Нажмите кнопку сборки на панели инструментов для запуска тулчейна..."
+                                );
+                            } else {
+                                // Моноширинный ретро-шрифт для вывода терминальных логов
+                                ui.monospace(self.compiler_log.as_str());
+                            }
+                        });
+                });
             }
 
             // ============================================================================

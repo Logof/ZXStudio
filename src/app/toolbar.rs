@@ -1,14 +1,13 @@
 // src/app/toolbar.rs
 use super::ZxIdeApp;
 use crate::app::states::CustomTab;
-use crate::core::pipeline::execute_resource_pipeline; // 🆕 Импортируем наш новый модульный конвейер
+use crate::core::pipeline::execute_resource_pipeline; // Импортируем наш новый модульный конвейер
 use crate::core::{
     image_processor::{generate_sprite_masks, process_tileset_for_mappy},
     save_project_json,
     validator::validate_attribute_clash,
 };
-use crate::models::project::LevelData; // Импортируем структуру уровня для создания новых на лету
-use eframe::egui; // 🆕 Импортируем перечисление вкладок дока
+use eframe::egui; // Импортируем перечисление вкладок дока
 
 pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
     egui::TopBottomPanel::top("toolbar")
@@ -22,7 +21,7 @@ pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
                             app.status_message = format!("✅ Проект успешно сохранен в {}{}.prj!", &app.project_path, &app.project_name);
                         }
                         Err(err) => {
-                            app.status_message = format!("❌ Ошибка保存ения проекта: {}", err);
+                            app.status_message = format!("❌ Ошибка сохранения проекта: {}", err);
                         }
                     }
                 }
@@ -88,61 +87,34 @@ pub fn render_toolbar(app: &mut ZxIdeApp, ctx: &egui::Context) {
 
                 ui.separator();
 
-                // ============================================================================
-                // ГЛOБАЛЬНЫЙ СЕЛЕКТОР УРОВНЕЙ ДЛЯ НАВЕДЕНИЯ ПОРЯДКА В GUI (Мультилевел)
-                // ============================================================================
-                ui.label("🎮 Уровень:");
-                
-                let mut selected_idx = app.project.current_level_index;
-                let combobox_res = egui::ComboBox::from_id_source("toolbar_level_selector")
-                    .selected_text(format!("[{}] {}", selected_idx + 1, app.project.levels[selected_idx].name))
-                    .show_ui(ui, |ui| {
-                        for i in 0..app.project.levels.len() {
-                            ui.selectable_value(
-                                &mut selected_idx,
-                                i,
-                                format!("[{}] {}", i + 1, app.project.levels[i].name),
-                            );
-                        }
-                    });
+                // 🔥 НОВОЕ УЛУЧШЕНИЕ: Кнопка асинхронной компиляции и сборки TAP-образа игры (v4.8)
+                let btn_text = if app.current_language == crate::app::menu_bar::Language::En {
+                    "🚀 Build game.tap"
+                } else {
+                    "🚀 Собрать game.tap"
+                };
 
-                // Если геймдизайнер выбрал другой уровень — мгновенно переключаем контекст всего приложения
-                if selected_idx != app.project.current_level_index {
-                    app.project.current_level_index = selected_idx;
-                    // Очищаем и сбрасываем кэш нарезанной графики под TileMode выбранного уровня
+                let build_btn = ui.add(
+                    egui::Button::new(
+                        egui::RichText::new(btn_text)
+                            .color(egui::Color32::from_rgb(0, 180, 255))
+                            .strong(),
+                    )
+                    .fill(egui::Color32::from_rgb(26, 34, 46)),
+                );
+
+                if build_btn.clicked() {
+                    // Эмиттим ленивый сигнал в общую шину egui контекста
                     ui.ctx().data_mut(|d| {
-                        d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
-                        d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
+                        d.insert_temp(egui::Id::new("trigger_async_compile_and_build"), true);
                     });
                 }
 
-                // Компактная кнопка мгновенного добавления нового уровня прямо на тулбаре
-                if ui.button("➕")
-                    .on_hover_text("Быстро добавить новый уровень в текущую кампанию")
-                    .clicked()
-                {
-                    let mut new_level = LevelData::default();
-                    new_level.name = format!("Level {}", app.project.levels.len() + 1);
-
-                    // Синхронизируем размер сетки комнат для нового уровня из глобальных параметров config
-                    let total_screens = app.project.config.map_goals.map_w * app.project.config.map_goals.map_h;
-                    new_level.screens.clear();
-                    for i in 0..total_screens {
-                        new_level.screens.insert(
-                            format!("screen_{}", i),
-                            crate::models::ScreenData::default(),
-                        );
-                    }
-
-                    app.project.levels.push(new_level);
-                    app.project.current_level_index = app.project.levels.len() - 1;
-
-                    // Вызываем жесткий сброс палитры для инициализации графического режима нового уровня
-                    ui.ctx().data_mut(|d| {
-                        d.insert_temp(egui::Id::new("trigger_reset_tileset_graphics"), true);
-                        d.insert_temp(egui::Id::new("trigger_clear_sliced_textures"), true);
-                    });
-                }
+                build_btn.on_hover_text(if app.current_language == crate::app::menu_bar::Language::En {
+                    "Asynchronously runs the full compilation pipeline and packs your retro game into a ready-to-run game.tap container"
+                } else {
+                    "Асинхронно запускает полный конвейер сборки и упаковывает вашу ретро-игру в готовый к запуску контейнер game.tap"
+                });
             });
         });
 }
