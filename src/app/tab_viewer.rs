@@ -142,12 +142,11 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                 render_hud_editor(ui, self.project, &self.hud_frame_texture);
             }
 
-            CustomTab::Console => {
+                        CustomTab::Console => {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.heading(&self.translations.tabs.console);
                         
-                        // Добавим сервисную кнопку быстрой ручной очистки логов
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.button("🗑 Очистить").clicked() {
                                 self.compiler_log.clear();
@@ -162,7 +161,7 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                     egui::ScrollArea::vertical()
                         .id_source("compiler_live_console_scroll")
                         .max_width(ui.available_width())
-                        .stick_to_bottom(true) // Принудительно держит фокус на свежих строках логов!
+                        .stick_to_bottom(true) // Автопрокрутка к новым ошибкам
                         .show(ui, |ui| {
                             if self.compiler_log.is_empty() {
                                 ui.colored_label(
@@ -170,12 +169,21 @@ impl<'a> TabViewer for ZxTabViewer<'a> {
                                     "   Консоль пуста. Нажмите кнопку сборки на панели инструментов для запуска тулчейна..."
                                 );
                             } else {
-                                // Моноширинный ретро-шрифт для вывода терминальных логов
-                                ui.monospace(self.compiler_log.as_str());
+                                // 🔥 МОДЕРНИЗАЦИЯ: Интерактивное многострочное поле только для чтения (Доступно выделение и копирование)
+                                egui::TextEdit::multiline(self.compiler_log)
+                                    .font(egui::TextStyle::Monospace) // Сохраняем ретро-шрифт терминала
+                                    .id_source("compiler_log_selectable_text")
+                                    .desired_width(ui.available_width())
+                                    .desired_rows(10)
+                                    .lock_focus(false)
+                                    .interactive(true) // Разрешаем клики и выделение мыслью
+                                    .frame(false)       // Прячем рамки поля ввода, оставляя вид чистого терминала
+                                    .show(ui);
                             }
                         });
                 });
             }
+
 
             // ============================================================================
             // ОПТИМИЗИРОВАННАЯ ОТРИСОВКА ОКНА НАСТРОЕК КОМПИЛЯТОРА С СИГНАЛЬНОЙ СИСТЕМОЙ

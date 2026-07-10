@@ -21,6 +21,7 @@ impl CompilerRunner {
         compile_command: String,
         is_multilevel: bool,
         project: ProjectData, // 🔥 Передаем снимок ОЗУ проекта в поток
+        project_name: String,
         log_tx: Sender<String>,
     ) {
         // Уходим в изолированный фоновый поток ОС, полностью освобождая UI egui от фризов
@@ -37,7 +38,9 @@ impl CompilerRunner {
             if !step1::run_spt2hp_step(base_path, &log_tx) { return; }
 
             // ШАГ 2: Компиляция Си-кода через Z88DK + Предварительное сжатие карты через ResourceCompressor
-            if !step2::run_z88dk_step(base_path, &z88dk_path, &compile_command, is_multilevel, &project, &log_tx) { return; }
+            if !step2::run_z88dk_step(base_path, &z88dk_path, &compile_command, is_multilevel, &project, &project_name, &log_tx) {
+                return; 
+            }
 
             // ШАГ 3: Нативная токенизация и ассемблирование BASIC-загрузчика
             if !step3::run_bas2tap_step(base_path, &log_tx) { return; }
@@ -46,7 +49,7 @@ impl CompilerRunner {
             if !step4::run_loading_screen_step(base_path, &log_tx) { return; }
 
             // ШАГ 5: Финальный контейнерный монтаж релиза ленты game.tap с XOR суммами
-            let _ = step5::run_tape_concat_step(base_path, &log_tx);
+            let _ = step5::run_tape_concat_step(base_path, &project_name, &log_tx);
         });
     }
 }

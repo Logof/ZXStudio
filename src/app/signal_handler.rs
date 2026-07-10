@@ -20,7 +20,8 @@ pub fn handle_incoming_signals(app: &mut ZxIdeApp, ui: &mut egui::Ui) {
             app.z88dk_path.clone(),
             app.compile_command.clone(),
             app.project.levels.len() > 1,
-            app.project.clone(), // Передаем изолированный клон снимка ОЗУ со всеми флагами сжатия v4.8
+            app.project.clone(),
+            app.project_name.clone(), // 🔥 ПЕРЕДАЕМ ИМЯ ИГРЫ (например, "cheril")
             app.compiler_tx.clone(),
         );
         

@@ -17,13 +17,19 @@ pub fn run_spt2hp_step(base_path: &Path, log_tx: &Sender<String>) -> bool {
         return true; 
     }
 
-    let content = match fs::read_to_string(&spt_path) {
-        Ok(c) => c,
+    let raw_bytes = match fs::read(&spt_path) {
+        Ok(b) => b,
         Err(e) => {
             let _ = log_tx.send(format!("❌ Ошибка чтения script.spt: {}", e));
             return false;
         }
     };
+
+    let (decoded_content, _, had_errors) = encoding_rs::WINDOWS_1251.decode(&raw_bytes);
+    if had_errors {
+        let _ = log_tx.send("⚠️ [Warning] Замечены подозрительные символы при декодировании Windows-1251, текст нормализован.".to_string());
+    }
+    let content = decoded_content.into_owned();
 
     // Нативный парсер: Нарезаем текст скрипта по секциям уровней "LEVEL X"
     let mut current_level: Option<usize> = None;

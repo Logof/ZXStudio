@@ -3,6 +3,7 @@ use super::{BuildContext, PipelineError, TaskStatus};
 use crate::models::ProjectData;
 use std::fs::File;
 use std::io::Write;
+use crate::core::utils::ts2bin::convert_tileset_to_bin;
 
 pub fn export_enemy_data(
     project: &ProjectData,
@@ -203,36 +204,37 @@ pub fn export_enemy_data(
         writeln!(file)?;
     }
 
-    // Экспорт глобальной графики эффектов
-    let file_path_global = ctx.output_dev_path.join("enems_extra.h");
-    let mut file_global = File::create(&file_path_global)?;
+    // ============================================================================
+    // 🔥 ФИНАЛЬНАЯ ЧАСТЬ: Экспорт глобальной графики эффектов (Исправлено)
+    // ============================================================================
     let gfx_dir = ctx.project_path.join("gfx");
     let sprites_extra_path = gfx_dir.join("sprites_extra.png");
     let sprites_bullet_path = gfx_dir.join("sprites_bullet.png");
 
-    let mut extra_info_msg = String::new();
+    let bin_extra_out = ctx.output_dev_path.join("sprites_extra.bin");
+    let bin_bullet_out = ctx.output_dev_path.join("sprites_bullet.bin");
 
     if sprites_extra_path.exists() {
-        if let Ok(c_code) = crate::core::utils::ts2bin::convert_extra_explosion_to_c_bytes(&sprites_extra_path) {
-            file_global.write_all(c_code.as_bytes())?;
-            extra_info_msg.push_str("💥 Взрыв загружен. ");
+        // Вызываем нативный конвертер тайлсетов, выпекая чистый .bin
+        if let Err(e) = convert_tileset_to_bin(&sprites_extra_path, &bin_extra_out, 7) {
+            println!("⚠️ Предупреждение компилятора графики эффектов взрыва: {}", e);
         }
     } else {
-        writeln!(file_global, "unsigned char sprite_expl [] = {{ 0x00 }};")?;
+        // Если файла нет — создаем пустой однобайтовый заглушечный плейсхолдер
+        let _ = std::fs::write(&bin_extra_out, vec![0x00]);
     }
 
     if sprites_bullet_path.exists() {
-        if let Ok(c_code) = crate::core::utils::ts2bin::convert_bullet_to_c_bytes(&sprites_bullet_path) {
-            file_global.write_all(c_code.as_bytes())?;
-            extra_info_msg.push_str("🏹 Пуля загружена.");
+        if let Err(e) = convert_tileset_to_bin(&sprites_bullet_path, &bin_bullet_out, 7) {
+            println!("⚠️ Предупреждение компилятора графики пуль: {}", e);
         }
     } else {
-        writeln!(file_global, "unsigned char sprite_bullet [] = {{ 0x00 }};")?;
+        let _ = std::fs::write(&bin_bullet_out, vec![0x00]);
     }
 
     if is_multilevel {
-        Ok(TaskStatus::Success(format!("Сгенерированы Си-заголовки enems[0..{}].h.", project.levels.len() - 1)))
+        Ok(TaskStatus::Success(format!("Сгенерированы Си-заголовки enems[0..{}].h и бинарники эффектов.", project.levels.len() - 1)))
     } else {
-        Ok(TaskStatus::Success("Сгенерирован классический Си-заголовок 'dev/enems.h'.".to_string()))
+        Ok(TaskStatus::Success("Сгенерирован классический Си-заголовок 'dev/enems.h' и бинарники эффектов.".to_string()))
     }
 }

@@ -1,10 +1,7 @@
 // src/core/pipeline/gfx_task.rs
 use super::{BuildContext, PipelineError, TaskStatus};
 use crate::core::utils::png2scr::convert_png_to_scr;
-// ============================================================================
-// ИСПРАВЛЕНО: Добавлен импорт нативного ядра ts2bin из утилит проекта
-// ============================================================================
-use crate::core::utils::ts2bin::compile_tileset_to_bin;
+use crate::core::utils::ts2bin::convert_tileset_to_bin;
 use crate::models::ProjectData;
 use std::path::PathBuf;
 
@@ -15,12 +12,12 @@ struct GfxAsset {
 }
 
 pub fn process_graphics(
-    project: &ProjectData, // Ссылка теперь активно используется для извлечения font_data
+    project: &ProjectData, // Используется для извлечения font_data
     ctx: &BuildContext,
 ) -> Result<TaskStatus, PipelineError> {
     let assets_dir = ctx.project_path.join("gfx");
 
-    // Декларативно описываем все заставки проекта. Сюда легко добавлять новые файлы.
+    // Декларативно описываем все заставки проекта
     let assets = [
         GfxAsset {
             name: "loading.png",
@@ -37,36 +34,36 @@ pub fn process_graphics(
     let mut success_count = 0;
     let mut warnings = Vec::new();
 
-    // Единый конвейер обработки файлов без дублирования условий
+    // Единый конвейер обработки экранов (Исправлено: убран лишний аргумент 0)
     for asset in assets.iter().filter(|a| a.src.exists()) {
-        match convert_png_to_scr(&asset.src, &asset.dst, 0) {
+        match convert_png_to_scr(&asset.src, &asset.dst) {
             Ok(()) => success_count += 1,
             Err(e) => warnings.push(format!("{} ({})", asset.name, e)),
         }
     }
 
     // ============================================================================
-    // ИСПРАВЛЕНО: Интеграция упаковочного таска ts.bin.
-    // Конвейер берёт gfx/work.png и кастомный шрифт из памяти проекта и собирает
-    // финальный монолит графики по правилам оригинального CLI-инструментария.
+    // ИСПРАВЛЕНО: Сборка оригинального tileset.bin
     // ============================================================================
     let work_png_path = assets_dir.join("work.png");
-    let output_ts_bin_path = ctx.output_gfx_path.join("ts.bin");
+    
+    // Внимание: В MTE MK1 файл должен называться строго tileset.bin для ассемблерных инклюдов
+    let output_ts_bin_path = ctx.output_dev_path.join("tileset.bin");
 
     let mut ts_bin_generated = false;
     if work_png_path.exists() {
-        // Запускаем наше нативное Rust-ядро конвертера (default_ink = -1)
-        match compile_tileset_to_bin(&project.font_data, &work_png_path, &output_ts_bin_path, -1) {
+        // Передаем правильные параметры: ОЗУ шрифта, PNG, целевой путь и цвет 7 (White Ink)
+        match convert_tileset_to_bin(&work_png_path, &output_ts_bin_path, 7) {
             Ok(()) => ts_bin_generated = true,
             Err(e) => warnings.push(format!("work.png (ts2bin error: {})", e)),
         }
     } else {
         warnings.push(
-            "work.png (Файл тайлсета отсутствует в gfx/, сборка ts.bin пропущена)".to_string(),
+            "work.png (Файл тайлсета отсутствует в gfx/, сборка tileset.bin пропущена)".to_string(),
         );
     }
 
-    // Интеллектуальное формирование отчета в консоль с учетом ts.bin
+    // Формирование отчета в консоль
     if !warnings.is_empty() && success_count == 0 && !ts_bin_generated {
         return Ok(TaskStatus::Warning(format!(
             "Ошибки сборки графики: {}",
@@ -77,9 +74,9 @@ pub fn process_graphics(
     let mut success_msg = format!("Собрано экранов-заставок: {}/2. ", success_count);
 
     if ts_bin_generated {
-        success_msg.push_str("Бинарник тайлсета и шрифта ts.bin успешно упакован!");
+        success_msg.push_str("Бинарник тайлсета и шрифта tileset.bin успешно упакован!");
     } else {
-        success_msg.push_str("Внимание: ts.bin не был сгенерирован.");
+        success_msg.push_str("Внимание: tileset.bin не был сгенерирован.");
     }
 
     if success_count > 0 || ts_bin_generated {
